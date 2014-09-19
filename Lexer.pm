@@ -27,16 +27,12 @@ sub next {
 # converts a list of lines into tokens
 sub tokenize {
     my ($self, @lines)  = @_;
-
-
-
     my @tokens = ();
     for my $line (@lines) {
         chomp $line;
         my $str = $line;            # str will be consumed
         my @token_buffer = ();      # hold tokens incase of error
         my $token;
-
 
         # scan at start for blank line, comment or indent
         ($str, $token) = $self->_scan_start($str);
@@ -86,12 +82,8 @@ sub tokenize {
                 last;
             } else {
                 push @token_buffer, $token;
-            }
-            print "$$token{type} $$token{value}| ";
+            }   
         }
-        print ":\n";
-        
-        # next;
 
         # push entire line and buffer onto tokens list
         push @tokens, {type => 'line', value => $line};
@@ -141,17 +133,17 @@ sub _scan_start {
 sub _scan_number {
     my ($self, $str) = @_;
     my $token;
-    if ($str =~ m/^[+-]?0[0-7]*/      ||
-        $str =~ m/^[+-]?0x[a-f0-9]+/i ||
-        $str =~ m/^[+-]?[1-9][0-9]*/  ||  
-        $str =~ m/^[+-]?[0-9]*[.][0-9]*(e[-+]?[0-9]+)?/i ) {
-        #number either octal, hexadecimal, decimal or float
+    print "+before $str";
+    if ($str =~ m/^[+-]?[0-9]*[.][0-9]*(e[-+]?[0-9]+)?/i || # float
+        $str =~ m/^[+-]?0x[a-f0-9]+/i ||                    # hex
+        $str =~ m/^[+-]?0[0-7]*/      ||                    # octal
+        $str =~ m/^[+-]?[1-9][0-9]*/ ) {                    # decimal
         $str = substr $str, length($&);
         $token = {type => 'number', value => lc($&)};
     } else {
         $token = {type => 'error'};
     }
-
+    print "+after $&";
     return ($str, $token);
 }
 
@@ -162,6 +154,7 @@ sub _scan_symbol {
     # bitwise    <<    >>      &       |      ^       ~
     # comparison <     >       <=      >=     ==      !=    <>
     my ($self, $str) = @_;
+
     my $token;
     if ($str =~ m/^(<<|>>|\*\*|\/|[-+*%&|^])?=/) {
         $token = {type => 'assignment', value => $&};
