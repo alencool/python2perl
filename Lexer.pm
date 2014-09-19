@@ -27,6 +27,9 @@ sub next {
 # converts a list of lines into tokens
 sub tokenize {
     my ($self, @lines)  = @_;
+
+
+
     my @tokens = ();
     for my $line (@lines) {
         chomp $line;
@@ -34,10 +37,11 @@ sub tokenize {
         my @token_buffer = ();      # hold tokens incase of error
         my $token;
 
+
         # scan at start for blank line, comment or indent
         ($str, $token) = $self->_scan_start($str);
         push @token_buffer, $token;
-        
+
         # scan for appropriate token based on 'peek' re
         # and consume the part of $str relating to the token.
         while($str) {
@@ -72,8 +76,10 @@ sub tokenize {
             } else {
                 $token = {type => 'error'};
             }
+            
 
-            if ($token{type} eq 'error') {
+
+            if ($$token{type} eq 'error') {
                 # return entire line as a comment
                 @token_buffer = [{ type     => 'comment', 
                                    value    => "#$line"}];
@@ -81,10 +87,14 @@ sub tokenize {
             } else {
                 push @token_buffer, $token;
             }
+            print "$$token{type} $$token{value}| ";
         }
+        print ":\n";
+        
+        # next;
 
         # push entire line and buffer onto tokens list
-        push @tokens, {type => line, value => $line};
+        push @tokens, {type => 'line', value => $line};
         push @tokens, @token_buffer;
     }
 
@@ -115,10 +125,10 @@ sub _scan_start {
         }
         #remove front indent
         $str =~ s/^\s*//;
-        $token = {type => 'indent', value => $indent}
+        $token = {type => 'indent', value => $indent};
     } elsif ($str =~ m/^\s*#/ || $str =~ /^\s*$/) {
         # line is a comment or is blank
-        $token = {type => 'comment', value => $str}
+        $token = {type => 'comment', value => $str};
         $str = '';
     } else {
         # otherwise return whole line as comment
@@ -131,9 +141,9 @@ sub _scan_start {
 sub _scan_number {
     my ($self, $str) = @_;
     my $token;
-    if ($str =~ m/^[+-]?0[0-7]+/      ||
+    if ($str =~ m/^[+-]?0[0-7]*/      ||
         $str =~ m/^[+-]?0x[a-f0-9]+/i ||
-        $str =~ m/^[+-]?[1-9][0-9]+/  ||  
+        $str =~ m/^[+-]?[1-9][0-9]*/  ||  
         $str =~ m/^[+-]?[0-9]*[.][0-9]*(e[-+]?[0-9]+)?/i ) {
         #number either octal, hexadecimal, decimal or float
         $str = substr $str, length($&);
@@ -153,9 +163,9 @@ sub _scan_symbol {
     # comparison <     >       <=      >=     ==      !=    <>
     my ($self, $str) = @_;
     my $token;
-    if ($str =~ m/^(<<|>>|**|\/|[+-*%&|^])?=/) {
+    if ($str =~ m/^(<<|>>|\*\*|\/|[-+*%&|^])?=/) {
         $token = {type => 'assignment', value => $&};
-    } elsif ($str =~ m/^(\+|-|**|*|\/|%)/) {
+    } elsif ($str =~ m/^(\+|-|\*\*|\*|\/|%)/) {
         $token = {type => 'arithmatic', value => $&};
     } elsif ($str =~ m/^(<<|>>|&|\||\^|~)/) {
         $token = {type => 'bitwise', value => $&};
@@ -213,16 +223,18 @@ sub _scan_string {
     } elsif ($str =~ m/^(r?)"((\\.|.)*?)"/i ||
              $str =~ m/^(r?)'((\\.|.)*?)'/i) {
         # complete string
+        $str = substr $str, length($&);
+        my $string_value = $2;
         if (lc($1) eq 'r') {
             # raw string
-            $2 = qq('$2');
+            $string_value = qq('$string_value');
         } else {
             # regular string
-            $2 =~ s/\$/\\\$/g;
-            $2 =~ s/@/\\@/g;
-            $2 = qq("$2");
+            $string_value =~ s/\$/\\\$/g;
+            $string_value =~ s/@/\\@/g;
+            $string_value = qq("$string_value");
         }
-        $token = {type => 'string', value => $2};
+        $token = {type => 'string', value => $string_value};
     } else {
         # incomplete string 
         $token = {type => 'error'};
