@@ -2,16 +2,14 @@ package Node;
 
 use strict;
 use warnings;
-
-########################################################################
-#                         Public Methods                               #
-########################################################################
+use Carp;
 
 # constructor
 sub new {
     my ($class, $value) = @_;
     my $self = { value      => '',      # str value to infer kind
                  kind       => '',      # what kind of node is it
+                 type       => undef,   # for use in infering var types
                  comment    => '',      # possible comment attached
                  complete   => 1,       # is contents full
                  parent     => undef,   # parent node
@@ -20,8 +18,15 @@ sub new {
                  children   => [],      # child nodes
                  depth      => 0 };     # indentation level
     my $object = bless $self, $class;
-    $self->_init($name, $value);
+    $self->_init($value);
     return $object;
+}
+
+# initialization
+sub _init {
+    my ($self, $value) = @_;
+    $self->{value} = $value;
+    $self->{kind} = 'NODE';
 }
 
 # get node kind
@@ -36,10 +41,16 @@ sub value {
     return $self->{value};
 }
 
+# returns "kind|value"
+sub signature {
+    my ($self) = @_;
+    return $self->{kind} . '|' . $self->{value};   
+}
+
 # add child node
 sub add_child {
     my ($self, $node) = @_;
-    TODO
+    carp __PACKAGE__ . " not accepting child nodes at this time"
 }
 
 # sets a nodes comment
@@ -66,50 +77,54 @@ sub is_leaf {
     return  @{$self->{children}} == 0;
 }
 
+# return true if node represents a statement
+sub is_statement {
+    return  0;
+}
 
-perl 
-$self = {arr => [1,3,4]};
-@my = @{$self->{arr}};
-print "@my";
+# return true if node represents a compount statement
+sub is_compound {
+    return  0;
+}
 
+# return true if node represents a simple statement
+sub is_simple {
+    return  0;
+}
 
-########################################################################
-#                         Private Methods                              #
-########################################################################
-
-# initialization
-sub _init {
-    my ($self, $value) = @_;
-    $self->{value} = $value;
-    $self->{kind} = 'NODE';
+# attempt to deduce its representive type and return it
+sub infer_type {
+    return undef;
 }
 
 # set node and childrens depth
-sub _set_depth {
+sub set_depth {
     my ($self, $depth) = @_;
     $self->{depth} = $depth;
-    for $node (@{$self->{children}}) {
+    for my $node (@{$self->{children}}) {
         $node->_set_depth($depth + 1);
     }
 }
 
 # set node parent
-sub _set_parent {
+sub set_parent {
     my ($self, $parent) = @_;
     $self->{parent} = $parent;
 }
 
 # set right sibling
-sub _set_right_sibling {
+sub set_right_sibling {
     my ($self, $next) = @_;
     $self->{next} = $next;
 }
 
 # set left sibling
-sub _set_left_sibling {
+sub set_left_sibling {
     my ($self, $prev) = @_;
     $self->{prev} = $prev;
 }
+
+
 
 
 
