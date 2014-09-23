@@ -1,3 +1,12 @@
+#
+#  Node.pm
+#  Node is a set of classes that define the abstract structure of 
+#  python code. It can be used to store information or other nodes in 
+#  the creation of a tree.
+#
+#  Created by Alen Bou-Haidar on 20/09/14, edited 24/9/14
+#
+
 use strict;
 use warnings;
 
@@ -20,7 +29,7 @@ sub new {
                  parent     => undef,   # parent node
                  prev       => undef,   # left sibling
                  next       => undef,   # right sibling
-                 children   => [],      # child nodes
+                 children   => [[]],      # child nodes
                  depth      => 0 };     # indentation level
     my $object = bless $self, $class;
     $self->_init($value);
@@ -59,7 +68,7 @@ sub add_child {
         my $rootlist = $self->{children};
         my $childlist = @$rootlist[$#$rootlist];
         push @$childlist, $node;
-        $node->_set_parent($self);
+        $node->set_parent($self);
         #TODO set siblings!
     }
 }
@@ -76,6 +85,7 @@ sub _new_child_list {
     my $rootlist = $self->{children};
     push @$rootlist, [];
 }
+
 
 # sets a nodes comment
 sub set_comment {
@@ -98,7 +108,9 @@ sub is_root {
 # return true if has no children
 sub is_leaf {
     my ($self) = @_;
-    return  @{$self->{children}} == 0;
+    my $rootlist = $self->{children};
+    my $first_child_list = @$rootlist[0];
+    return  @$first_child_list == 0;
 }
 
 # return true if node represents a statement
@@ -156,10 +168,36 @@ sub set_left_sibling {
 # |___|_\___|_|_|_\___|_||_\__| |_|\_\___/\__,_\___/__/ 
 #
 #-----------------------------------------------------------------------
+# Holds the original line
+package Node::Start;
+use base 'Node';
 
+sub kind {
+    return 'START';
+}
+
+#-----------------------------------------------------------------------
+# Holds the line comment if any
+package Node::End;
+use base 'Node';
+
+sub kind {
+    return 'END';
+}
+
+#-----------------------------------------------------------------------
+# Indicates an unrecognised token
+package Node::Error;
+use base 'Node';
+
+sub kind {
+    return 'ERROR';
+}
+
+#-----------------------------------------------------------------------
 
 package Node::Arithmetic;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'ARITHMETIC';
@@ -167,15 +205,23 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Bitwise;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'BITWISE';
 }
 
 #-----------------------------------------------------------------------
+package Node::Comment;
+use base 'Node';
+
+sub kind {
+    return 'COMMENT';
+}
+
+#-----------------------------------------------------------------------
 package Node::Comparison;
-use parent 'Node';
+use base 'Node';
 
 
 sub _init {
@@ -190,7 +236,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Encloser;
-use parent 'Node';
+use base 'Node';
 
 
 sub _init {
@@ -210,10 +256,7 @@ sub _init {
         } else {
             die "Not a bracket.";
         }
-
-    } else {
-        die "Not a bracket.";
-    }
+    } 
 
     $self->{value} = $value;
     
@@ -226,14 +269,10 @@ sub kind {
 sub add_child {
     my ($self, $node) = @_;
 
-    if ($node->is_statement) {
-        croak __PACKAGE__ . " does not accept statments";
-    }
-
     my $children = $self->{children};
     if ($node->signature ~~ ['SEPERATOR|,', 'SEPERATOR|:']){
         # append new list
-        push @$children [];
+        push @$children, [];
 
     } elsif ($node->signature eq $self->{closevalue}) {
         # statement complete
@@ -241,8 +280,8 @@ sub add_child {
 
     } else {
         # push child onto last list
-        $exp = @$children[$#$children];
-        push @$exp $node;
+        my $exp = @$children[$#$children];
+        push @$exp, $node;
         $node->_set_parent($self);
     }
 
@@ -250,15 +289,23 @@ sub add_child {
 
 #-----------------------------------------------------------------------
 package Node::Identifier;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'IDENTIFIER';
 }
 
 #-----------------------------------------------------------------------
+package Node::Indent;
+use base 'Node';
+
+sub kind {
+    return 'INDENT';
+}
+
+#-----------------------------------------------------------------------
 package Node::In;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'IN';
@@ -267,7 +314,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Logical;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'LOGICAL';
@@ -275,7 +322,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Number;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'NUMBER';
@@ -283,7 +330,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Seperator;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'SEPERATOR';
@@ -291,7 +338,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::String;
-use parent 'Node';
+use base 'Node';
 
 sub kind {
     return 'STRING';
@@ -299,9 +346,16 @@ sub kind {
 
 sub is_raw {
     my ($self) = @_;
-    my $char = substr $self->{value} 0 1;
+    my $char = substr $self->{value}, 0, 1;
 
     return ($char eq "'");
+}
+#-----------------------------------------------------------------------
+package Node::Whitespace;
+use base 'Node';
+
+sub kind {
+    return 'WHITESPACE';
 }
 
 #-----------------------------------------------------------------------
@@ -312,7 +366,7 @@ sub is_raw {
 #             |_|                                 
 #-----------------------------------------------------------------------
 package Node::Simple;
-use parent 'Node';
+use base 'Node';
 
 sub is_simple {
     return  1;
@@ -331,10 +385,6 @@ sub _init {
 sub _on_event_add_child {
     my ($self, $node) = @_;
 
-    if ($node->is_statement) {
-        croak __PACKAGE__ . " does not accept statments";
-    }
-
     my $add_child = 1;
     if ($node->signature eq 'SEPERATOR|,') {
         $self->_new_child_list;
@@ -348,7 +398,7 @@ sub _on_event_add_child {
 
 #-----------------------------------------------------------------------
 package Node::Assignment;
-use parent 'Node::Simple';
+use base 'Node::Simple';
 
 sub _init {
     my ($self, $value) = @_;
@@ -361,7 +411,7 @@ sub kind {
 }
 #-----------------------------------------------------------------------
 package Node::Blank;
-use parent 'Node::Simple';
+use base 'Node::Simple';
 
 
 sub _init {
@@ -375,8 +425,16 @@ sub kind {
 }
 
 #-----------------------------------------------------------------------
+package Node::Invisible;
+use base 'Node::Simple';
+
+sub kind {
+    return 'INVISIBLE';
+}
+
+#-----------------------------------------------------------------------
 package Node::Break;
-use parent 'Node::Simple';
+use base 'Node::Simple';
 
 sub _init {
     my ($self, $value) = @_;
@@ -390,7 +448,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Continue;
-use parent 'Node::Simple';
+use base 'Node::Simple';
 
 sub _init {
     my ($self, $value) = @_;
@@ -404,7 +462,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Expression;
-use parent 'Node::Simple';
+use base 'Node::Simple';
 
 sub kind {
     return 'EXPRESSION';
@@ -413,7 +471,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Print;
-use parent 'Node::Simple';
+use base 'Node::Simple';
 
 sub kind {
     return 'PRINT';
@@ -421,7 +479,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Return;
-use parent 'Node::Simple';
+use base 'Node::Simple';
 
 sub kind {
     return 'RETURN';
@@ -436,7 +494,7 @@ sub kind {
 #                |_|                                               
 #-----------------------------------------------------------------------
 package Node::Compound;
-use parent 'Node';
+use base 'Node';
 
 sub is_compound {
     return  1;
@@ -447,11 +505,58 @@ sub kind {
 }
 
 #-----------------------------------------------------------------------
+package Node::If;
+use base 'Node::Compound';
+
+sub kind {
+    return 'IF';
+}
+
+#-----------------------------------------------------------------------
+package Node::Elif;
+use base 'Node::Compound';
+
+sub kind {
+    return 'ELIF';
+}
+
+#-----------------------------------------------------------------------
+package Node::Else;
+use base 'Node::Compound';
+
+sub kind {
+    return 'ELSE';
+}
+
+#-----------------------------------------------------------------------
+package Node::For;
+use base 'Node::Compound';
+
+sub kind {
+    return 'FOR';
+}
+
+#-----------------------------------------------------------------------
+package Node::While;
+use base 'Node::Compound';
+
+sub kind {
+    return 'WHILE';
+}
+
+#-----------------------------------------------------------------------
+package Node::Def;
+use base 'Node::Compound';
+
+sub kind {
+    return 'DEF';
+}
+
+#-----------------------------------------------------------------------
+
 package Node::Code;
-use parent 'Node';
+use base 'Node';
 
-
-# initialization
 sub _init {
     my ($self) = @_;
     $self->{complete} = 0;
@@ -463,12 +568,8 @@ sub kind {
 
 sub add_child {
     my ($self, $node) = @_;
-
-    if (not $node->is_statement) {
-        croak __PACKAGE__ . " only accepts statments";
-    }
     
-    push @{$self->{children}} $node;
+    push @{$self->{children}}, $node;
     $node->_set_parent($self);
 
 }

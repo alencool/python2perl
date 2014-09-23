@@ -1,3 +1,11 @@
+#
+#  Lexer.pm
+#  Lexer is a class that takes in a list of python code and performs 
+#  lexical analysis, breaking it up into node tokens. 
+#
+#  Created by Alen Bou-Haidar on 19/09/14, edited 24/9/14
+#
+
 package Lexer;
 
 use strict;
@@ -7,23 +15,55 @@ use feature 'switch';
 use constant KW_ERROR  => qw(del is raise assert from lambda global 
                              try class except yield exec finally pass);
 
+# matches the exsistance of indent on a line
+my $re_indent       = qr/(^\s*)[^#]/;
 
-# Compile Regex for each token type
-my $reIndent        = qr/(^\s*)[^#]/;
-my $reFloat         = qr/^[+-]?[0-9]*[.][0-9]*(e[-+]?[0-9]+)?/i;
-my $reHex           = qr/^[+-]?0x[a-f0-9]+/i;
-my $reOctal         = qr/^[+-]?0[0-7]*/;
-my $reDecimal       = qr/^[+-]?[1-9][0-9]*/;
-my $reAssignment    = qr/^(<<|>>|\*\*|\/|[-+*%&|^])?=/;
-my $reArithmetic    = qr/^(\+|-|\*\*|\*|\/|%)/;
-my $reBitwise       = qr/^(<<|>>|&|\||\^|~)/;
-my $reComparison    = qr/^(<=|>=|==|!=|<>|<|>)/;
-my $reString        = qr/^(r?)("|')(?!\2\2)(.*?)(?<!\\)\2/i;
-my $reEncloser      = qr/^[][(){}]/;
-my $reSeperator     = qr/^[.,:;]/;
-my $reComment       = qr/\s*#/;
-my $reWhitespace    = qr/^\s*/;
-my $reWord          = qr/^[a-z_][a-z0-9_]*/i;
+# matches a floating point number
+my $re_float        = qr/^[+-]?[0-9]*[.][0-9]*(e[-+]?[0-9]+)?/i;
+
+# matches a hexadecimal number
+my $re_hex          = qr/^[+-]?0x[a-f0-9]+/i;
+
+# matches a octal number
+my $re_octal        = qr/^[+-]?0[0-7]*/;
+
+# matches a decimal number
+my $re_decimal      = qr/^[+-]?[1-9][0-9]*/;
+
+# matches assigment operators
+# =   +=    -=    *=    /=    %=    &=    |=    ^=    >>=   <<=   **= 
+my $re_assignment   = qr/^(<<|>>|\*\*|\/|[-+*%&|^])?=/;
+
+# matches arithmetic operators
+# +   -   *   /   **   %
+my $re_arithmetic   = qr/^(\+|-|\*\*|\*|\/|%)/;
+
+# matches bitwise operators
+# <<    >>    &   |   ^   ~
+my $re_bitwise      = qr/^(<<|>>|&|\||\^|~)/;
+
+# matches comparison operators
+# <   >     <=    >=    ==    !=    <>
+my $re_comparison   = qr/^(<=|>=|==|!=|<>|<|>)/;
+
+# matches regular and raw strings; does not match unicode and multiline
+my $re_string       = qr/^(r?)("|')(?!\2\2)(.*?)(?<!\\)\2/i;
+
+# matches enclosing brackets
+my $re_encloser     = qr/^[][(){}]/;
+
+# matches seperator elements
+my $re_seperator    = qr/^[.,:;]/;
+
+# matches a comment
+my $re_comment      = qr/\s*#/;
+
+# matches any whitespace characters
+my $re_whitespace   = qr/^\s*/;
+
+# matches any words
+my $re_word         = qr/^[a-z_][a-z0-9_]*/i;
+
 
 # constructor
 sub new {
@@ -58,7 +98,7 @@ sub tokenize {
         my $node;
 
         # scan at start for indent
-        if ($str =~ /$reIndent/) {
+        if ($str =~ /$re_indent/) {
             $node = $self->_get_indent($str);
             push @token_buffer, $node;
         }
@@ -100,37 +140,37 @@ sub _extract_node {
 
 
     given ($$str) {
-        when (/$reEncloser/)    { $node = new Node::Encloser($&);
-                                  $$str =~ s/$reEncloser// }
+        when (/$re_encloser/)   { $node = new Node::Encloser($&);
+                                  $$str =~ s/$re_encloser// }
         
-        when (/$reFloat/)       { $node = new Node::Number($&);
-                                  $$str =~ s/$reFloat// }
+        when (/$re_float/)      { $node = new Node::Number($&);
+                                  $$str =~ s/$re_float// }
         
-        when (/$reHex/)         { $node = new Node::Number($&);
-                                  $$str =~ s/$reHex// }
+        when (/$re_hex/)        { $node = new Node::Number($&);
+                                  $$str =~ s/$re_hex// }
         
-        when (/$reOctal/)       { $node = new Node::Number($&);
-                                  $$str =~ s/$reOctal// }
+        when (/$re_octal/)      { $node = new Node::Number($&);
+                                  $$str =~ s/$re_octal// }
         
-        when (/$reDecimal/)     { $node = new Node::Number($&);
-                                  $$str =~ s/$reDecimal// }
+        when (/$re_decimal/)    { $node = new Node::Number($&);
+                                  $$str =~ s/$re_decimal// }
         
-        when (/$reSeperator/)   { $node = new Node::Number($&);
-                                  $$str =~ s/$reSeperator// }
+        when (/$re_seperator/)  { $node = new Node::Number($&);
+                                  $$str =~ s/$re_seperator// }
         
-        when (/$reAssignment/)  { $node = new Node::Assignment($&);
-                                  $$str =~ s/$reAssignment// }
+        when (/$re_assignment/) { $node = new Node::Assignment($&);
+                                  $$str =~ s/$re_assignment// }
         
-        when (/$reArithmetic/)  { $node = new Node::Arithmetic($&);
-                                  $$str =~ s/$reArithmetic// }
+        when (/$re_arithmetic/) { $node = new Node::Arithmetic($&);
+                                  $$str =~ s/$re_arithmetic// }
         
-        when (/$reBitwise/)     { $node = new Node::Bitwise($&);
-                                  $$str =~ s/$reBitwise// }
+        when (/$re_bitwise/)    { $node = new Node::Bitwise($&);
+                                  $$str =~ s/$re_bitwise// }
         
-        when (/$reComparison/)  { $node = new Node::Comparison($&);
-                                  $$str =~ s/$reComparison// }
+        when (/$re_comparison/) { $node = new Node::Comparison($&);
+                                  $$str =~ s/$re_comparison// }
         
-        when (/$reString/)      { $value = $3;
+        when (/$re_string/)     { $value = $3;
                                   if (lc($1) eq 'r') {
                                        # raw string
                                        $value = qq('$value');
@@ -142,15 +182,15 @@ sub _extract_node {
                                        $value = qq("$value");
                                   }
                                   $node = new Node::String($value);
-                                  $$str =~ s/$reString// }
+                                  $$str =~ s/$re_string// }
         
-        when (/$reWord/)        { $node = $self->_get_word_node($&);
-                                  $$str =~ s/$reWord// }
+        when (/$re_word/)       { $node = $self->_get_word_node($&);
+                                  $$str =~ s/$re_word// }
 
-        when (/$reComment/)     { $node = new Node::Comment($$str) }
+        when (/$re_comment/)    { $node = new Node::Comment($$str) }
 
-        when (/$reWhitespace/)  { $node = new Node::Whitespace();
-                                  $$str =~ s/$reWhitespace// }
+        when (/$re_whitespace/) { $node = new Node::Whitespace();
+                                  $$str =~ s/$re_whitespace// }
 
         default                 { $node = new Node::Error() }
     }
@@ -163,24 +203,24 @@ sub _get_word_node {
     my ($self, $word) = @_;
     my $node;
     given ($word) {
-        when ('if')         { $node = new Node::If() }
-        when ('elif')       { $node = new Node::Elif() }
-        when ('else')       { $node = new Node::Else() }
-        when ('for')        { $node = new Node::For() }
-        when ('while')      { $node = new Node::While() }
-        when ('def')        { $node = new Node::Def() }
-        when ('return')     { $node = new Node::Return() }
-        when ('break')      { $node = new Node::Break() }
-        when ('continue')   { $node = new Node::Continue() }
-        when ('print')      { $node = new Node::Print() }
+        when ('if')         { $node = new Node::If }
+        when ('elif')       { $node = new Node::Elif }
+        when ('else')       { $node = new Node::Else }
+        when ('for')        { $node = new Node::For }
+        when ('while')      { $node = new Node::While }
+        when ('def')        { $node = new Node::Def }
+        when ('return')     { $node = new Node::Return }
+        when ('break')      { $node = new Node::Break }
+        when ('continue')   { $node = new Node::Continue }
+        when ('print')      { $node = new Node::Print }
         when ('not')        { $node = new Node::Logical('not') }
         when ('and')        { $node = new Node::Logical('and') }
         when ('or')         { $node = new Node::Logical('or') }
         when ('True')       { $node = new Node::Number('1') }
         when ('False')      { $node = new Node::Number('0') }
-        when ('in')         { $node = new Node::In() }
-        when ('import')     { $node = new Node::Invisible() }
-        when ([KW_ERROR])   { $node = new Node::Error() }
+        when ('in')         { $node = new Node::In }
+        when ('import')     { $node = new Node::Invisible }
+        when ([KW_ERROR])   { $node = new Node::Error }
         default             { $node = new Node::Identifier($word) }
     }
 
