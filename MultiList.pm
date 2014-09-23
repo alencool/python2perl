@@ -30,22 +30,21 @@ sub new {
 # returns number of pegs
 sub get_peg_count {
     my ($self) = @_;
-    return scalar @{$self->{pegs};
+    return scalar @{$self->{pegs}};
 }
 
-# append item to peg at peg_index
+# append items to peg at peg_index
 sub append_to_peg {
-    my ($self, $peg_index, $item) = @_;
-    $peg = $self->get_peg($peg_index);
-    push @$peg, $item;
+    my ($self, $peg_index, @items) = @_;
+    my $peg = $self->get_peg($peg_index);
+    push @$peg, @items;
 }
 
-# append item to last peg
+# append items to last peg
 sub append_to_lastpeg {
-    my ($self, $item) = @_;
-    my pegs = _pegs
+    my ($self, @items) = @_;
     my $lastpeg_idex = $self->get_peg_count - 1;
-    $self->append_to_peg($lastpeg_idex, $item);
+    $self->append_to_peg($lastpeg_idex, @items);
 }
 
 # creates new peg at end of pegs array
@@ -57,7 +56,8 @@ sub new_peg {
 # get peg reference at peg_index
 sub get_peg {
     my ($self, $peg_index) = @_;
-    return $self->_pegs[$peg_index];
+    # my $pegs = $self->_pegs;
+    return @{$self->{pegs}}[$peg_index];
 }
 
 # returns true if single peg with no items
@@ -67,7 +67,7 @@ sub is_empty {
 }
 
 # returns pegs as a list
-sub _pegs {
+sub get_pegs {
     my ($self) = @_;
     return (@{$self->{pegs}});
 }
