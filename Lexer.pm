@@ -16,7 +16,7 @@ use constant KW_ERROR  => qw(del is raise assert from lambda global
                              try class except yield exec finally pass);
 
 # matches the exsistance of indent on a line
-my $re_indent       = qr/(^\s*)[^#]/;
+my $re_indent       = qr/(^\s*)[^#\s]/;
 
 # matches a floating point number
 my $re_float        = qr/^[+-]?[0-9]*[.][0-9]*(e[-+]?[0-9]+)?/i;
@@ -53,7 +53,7 @@ my $re_string       = qr/^(r?)("|')(?!\2\2)(.*?)(?<!\\)\2/i;
 my $re_encloser     = qr/^[][(){}]/;
 
 # matches seperator elements
-my $re_seperator    = qr/^[.,:;]/;
+my $re_seperator    = qr/^[,:;]/;
 
 # matches a comment
 my $re_comment      = qr/\s*#/;
@@ -61,8 +61,11 @@ my $re_comment      = qr/\s*#/;
 # matches any whitespace characters
 my $re_whitespace   = qr/^\s*/;
 
-# matches any words
-my $re_word         = qr/^[a-z_][a-z0-9_]*/i;
+# matches any identifier; does not match a call 
+my $re_identifier   = qr/^(\.?\s*(?!\w+\s*\()[a-z_]\w*\s*)+/i;
+
+# matches method and function calls
+my $re_call         = qr/^\.\s*[a-z_]\w*\s*\(/i;
 
 
 # constructor
@@ -79,10 +82,16 @@ sub has_next {
     return @{$self->{nodes}} > 0;
 }
 
-# returns next token
+# returns next token, and removes from list
 sub next {
     my $self = shift;
     return shift @{$self->{nodes}}; 
+}
+
+# returns next token
+sub peak {
+    my $self = shift;
+    return @{$self->{nodes}}[0]; 
 }
 
 # converts a list of lines into node tokens
@@ -91,10 +100,9 @@ sub tokenize {
     my @nodes = ();
 
     for my $line (@lines) {
-        chomp $line;
+        chomp $line;                # remove new lines
         my $str = $line;            # str will be consumed
         my @token_buffer = ();      # hold nodes incase of error
-        my $comment = '';           # holds the comment if one exists
         my $node;
 
         # scan at start for indent
@@ -107,27 +115,26 @@ sub tokenize {
         while($str) {
 
             $node = $self->_extract_node(\$str);
-
-            if ($node->kind eq 'ERROR') {
-                # return entire line as a comment
-                $comment = "#$line";
-                @token_buffer = ();
-                last;
-            } elsif ($node->kind eq 'WHITESPACE') {
-                # ignore whitespace
+            if ($node->kind eq 'WHITESPACE') {
+                # ignore any whitespace
                 next;
-            } elsif ($node->kind eq 'COMMENT') {
-                $comment = $node->value;
+            } elsif ($node->kind eq 'ERROR') {
+                # return entire line as a comment
+                @token_buffer = (new Node::Comment("#$line"));
                 last;
             } else {
                 push @token_buffer, $node;
             }   
         }
 
-        # push entire line and buffer onto nodes list
-        push @nodes, new Node::Start($line);
+        # remove trailing stmt_seperator
+        if ($self->_trailing_stmt_seperator @token_buffer) {
+            pop @token_buffer;
+        }
+
+        # push buffer onto nodes list
         push @nodes, @token_buffer;
-        push @nodes, new Node::End($comment);
+        push @nodes, new Node::Seperator(';');
     }
 
     $self->{nodes} = \@nodes;
@@ -184,10 +191,14 @@ sub _extract_node {
                                   $node = new Node::String($value);
                                   $$str =~ s/$re_string// }
         
-        when (/$re_word/)       { $node = $self->_get_word_node($&);
-                                  $$str =~ s/$re_word// }
+        when (/$re_identifier/) { $node = $self->_get_identifier($&);
+                                  $$str =~ s/$re_identifier// }
 
-        when (/$re_comment/)    { $node = new Node::Comment($$str) }
+        when (/$re_call/)       { $node = $self->_get_call($&);
+                                  $$str =~ s/$re_call// }
+
+        when (/$re_comment/)    { $node = new Node::Comment($$str);
+                                  $$str =~ s/$re_string// }
 
         when (/$re_whitespace/) { $node = new Node::Whitespace();
                                   $$str =~ s/$re_whitespace// }
@@ -198,10 +209,13 @@ sub _extract_node {
     return $node;
 }
 
-# Create correct node based on word
-sub _get_word_node {
+
+
+# Create correct node based on identifier
+sub _get_identifier {
     my ($self, $word) = @_;
     my $node;
+    $word = s/\s//g;
     given ($word) {
         when ('if')         { $node = new Node::If }
         when ('elif')       { $node = new Node::Elif }
@@ -220,6 +234,9 @@ sub _get_word_node {
         when ('False')      { $node = new Node::Number('0') }
         when ('in')         { $node = new Node::In }
         when ('import')     { $node = new Node::Invisible }
+        when ('sys.stdout') { $node = new Node::Stdout }
+        when ('sys.stdin')  { $node = new Node::Stdin }
+        when ('sys.argv')   { $node = new Node::Argv }
         when ([KW_ERROR])   { $node = new Node::Error }
         default             { $node = new Node::Identifier($word) }
     }
@@ -227,13 +244,40 @@ sub _get_word_node {
     return $node;
 }
 
+# Create correct node based on call
+sub _get_call {
+    my ($self, $call) = @_;
+    my $node;
+    $call = s/[\s\(]//g;
+    given ($word) {
+        when ('int')        { $node = new Node::CallInt }
+        when ('len')        { $node = new Node::CallLen }
+        when ('open')       { $node = new Node::CallOpen }
+        when ('sorted')     { $node = new Node::CallSorted }
+        when ('range')      { $node = new Node::CallRange }
+        when ('.write')     { $node = new Node::CallWrite }
+        when ('.readline')  { $node = new Node::CallReadline }
+        when ('.readlines') { $node = new Node::CallReadlines }
+        when ('.input')     { $node = new Node::CallFileinput }
+        when ('.append')    { $node = new Node::CallAppend }
+        when ('.pop')       { $node = new Node::CallPop }
+        when ('.keys')      { $node = new Node::CallKeys }
+        when ('.split')     { $node = new Node::CallSplit }
+        when ('.join')      { $node = new Node::CallJoin }
+        when ('.match')     { $node = new Node::CallMatch }
+        when ('.search')    { $node = new Node::CallSearch }
+        when ('.sub')       { $node = new Node::CallSub }
+        default             { $node = new Node::Call($call) }
+    }
+
+    return $node;
+}
+
 # extract unix compatible expansion of tabs
+# TAB 1-8 spaces to get multiple of 8 upto and including TAB
 sub _get_indent {
     my ($self, $str) = @_;
     my $node;
-    # line has statements, find indent 
-    # TAB 1-8 spaces to get multiple of 8 upto and including TAB
-
     my $whitespace = $1;
     my $num_spaces = 0;
     while ($whitespace =~/( +|\t)/g) {
@@ -243,11 +287,15 @@ sub _get_indent {
                 $num_spaces += length($1);
           }
     }
-
-    #remove front indent
     $node = new Node::Indent($num_spaces);
     
     return $node;
 }
+
+# return True when a list has a training stmt_seperator
+sub _trailing_stmt_seperator {
+    return (@_ > 1 and @_[-1]->kind eq 'STMT_SEPERATOR')
+}
+
 
 1;
