@@ -4,11 +4,15 @@
 #  python code. It can be used to store information or other nodes in 
 #  the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 20/09/14, edited 24/9/14
+#  Created by Alen Bou-Haidar on 20/09/14, edited 25/9/14
 #
 
 use strict;
 use warnings;
+use MultiList;
+use feature 'switch';
+use constant TRUE   => 1;
+use constant FALSE  => 0;
 
 #-----------------------------------------------------------------------
 #  ___                 _  _         _     
@@ -18,19 +22,25 @@ use warnings;
 # 
 #-----------------------------------------------------------------------
 package Node;
+use base 'Class::Accessor';
+Node->mk_accessors(qw(value type comment complete is_compound is_simple 
+                      depth parent prev next children ));
 
 # constructor
 sub new {
     my ($class, $value) = @_;
-    my $self = { value      => '',      # str value to infer kind
-                 type       => undef,   # for use in infering var types
-                 comment    => '',      # possible comment attached
-                 complete   => 1,       # is contents full
-                 parent     => undef,   # parent node
-                 prev       => undef,   # left sibling
-                 next       => undef,   # right sibling
-                 children   => [[]],      # child nodes
-                 depth      => 0 };     # indentation level
+    my $self = { value       => $value,  # str value to infer kind
+                 type        => undef,   # for use in infering var types
+                 comment     => '',      # possible comment attached
+                 complete    => TRUE,    # is contents full
+                 is_compound => FALSE,   # is compound statement
+                 is_simple   => FALSE,   # is simple statement
+                 depth       => 0,       # indentation level
+                 parent      => undef,   # parent node
+                 prev        => undef,   # left sibling
+                 next        => undef,   # right sibling
+                 children    => new MultiList }
+
     my $object = bless $self, $class;
     $self->_init($value);
     return $object;
@@ -38,8 +48,7 @@ sub new {
 
 # initialization
 sub _init {
-    my ($self, $value) = @_;
-    $self->{value} = $value;
+
 }
 
 # get node kind
@@ -47,86 +56,49 @@ sub kind {
     return 'NODE';
 }
 
-# get node value
-sub value {
-    my ($self) = @_;
-    return $self->{value};
-}
-
-# returns signature as "kind|value"
-sub signature {
-    my ($self) = @_;
-    return $self->kind . '|' . $self->value;   
-}
-
-# add child node
+# add child node, set its depth, parent and sibling properties
 sub add_child {
     my ($self, $node) = @_;
-
-    if ($self->_on_event_add_child($node)){
-        # All systems are go, can append child node to last rootlist
-        my $rootlist = $self->{children};
-        my $childlist = @$rootlist[$#$rootlist];
-        push @$childlist, $node;
-        $node->set_parent($self);
-        #TODO set siblings!
+    if ($node->kind eq 'COMMENT') {
+        $self->comment($node->value);
+    } elsif (not $self->complete) {
+        my $okay_to_add = $self->_on_event_add_child($node);
+        if ($okay_to_add){
+            my $lastpeg = $self->children->get_lastpeg;
+            push @$lastpeg, $node;
+            $node->parent($self);
+            $node->set_depth($self->depth + 1);
+            if (@$lastpeg > 1) {
+                my $prev_node = $$lastpeg[-2];
+                $prev_node->next($node);
+                $node->prev($prev_node);
+            }
+        }
     }
 }
 
 # on add child event, return true to add child, false to ignore
 sub _on_event_add_child {
     my ($self, $node) = @_;
-    return 0;
-}
-
-# create new child list
-sub _new_child_list {
-    my ($self) = @_;
-    my $rootlist = $self->{children};
-    push @$rootlist, [];
-}
-
-
-# sets a nodes comment
-sub set_comment {
-    my ($self, $comment) = @_;
-    $self->{comment} = $comment;
-}
-
-# return true if node is complete
-sub complete {
-    my ($self) = @_;
-    return $self->{complete};
+    return FALSE;
 }
 
 # return true if no parent set
 sub is_root {
     my ($self) = @_;
-    return defined $self->{parent};
+    return not defined $self->parent;
 }
 
 # return true if has no children
 sub is_leaf {
     my ($self) = @_;
-    my $rootlist = $self->{children};
-    my $first_child_list = @$rootlist[0];
-    return  @$first_child_list == 0;
+    return  $self->children->is_empty;
 }
 
 # return true if node represents a statement
 sub is_statement {
     my ($self) = @_;
     return ($self->is_simple || $self->is_compound);
-}
-
-# return true if node represents a compount statement
-sub is_compound {
-    return 0;
-}
-
-# return true if node represents a simple statement
-sub is_simple {
-    return  0;
 }
 
 # attempt to deduce its representive type and return it
@@ -137,29 +109,17 @@ sub infer_type {
 # set node and childrens depth
 sub set_depth {
     my ($self, $depth) = @_;
-    $self->{depth} = $depth;
-    for my $node (@{$self->{children}}) {
-        $node->_set_depth($depth + 1);
+    $self->depth($depth);
+    
+    # update child nodes recursively
+    my @pegs = $self->children->get_pegs;
+    for my $peg (@pegs) {
+        for my $child (@$peg) {
+            $child->set_depth($depth + 1);
+        }
     }
 }
 
-# set node parent
-sub set_parent {
-    my ($self, $parent) = @_;
-    $self->{parent} = $parent;
-}
-
-# set right sibling
-sub set_right_sibling {
-    my ($self, $next) = @_;
-    $self->{next} = $next;
-}
-
-# set left sibling
-sub set_left_sibling {
-    my ($self, $prev) = @_;
-    $self->{prev} = $prev;
-}
 
 #-----------------------------------------------------------------------
 #  ___ _                   _     _  _         _        
@@ -168,24 +128,7 @@ sub set_left_sibling {
 # |___|_\___|_|_|_\___|_||_\__| |_|\_\___/\__,_\___/__/ 
 #
 #-----------------------------------------------------------------------
-# Holds the original line
-package Node::Start;
-use base 'Node';
 
-sub kind {
-    return 'START';
-}
-
-#-----------------------------------------------------------------------
-# Holds the line comment if any
-package Node::End;
-use base 'Node';
-
-sub kind {
-    return 'END';
-}
-
-#-----------------------------------------------------------------------
 # Indicates an unrecognised token
 package Node::Error;
 use base 'Node';
@@ -201,6 +144,14 @@ use base 'Node';
 
 sub kind {
     return 'ARITHMETIC';
+}
+
+#-----------------------------------------------------------------------
+package Node::Assignment;
+use base 'Node';
+
+sub kind {
+    return 'ASSIGNMENT';
 }
 
 #-----------------------------------------------------------------------
@@ -226,8 +177,7 @@ use base 'Node';
 
 sub _init {
     my ($self, $value) = @_;
-    $value = '!=' if ($value eq '<>');
-    $self->{value} = $value;
+    $self->value('!=') if ($value eq '<>');
 }
 
 sub kind {
@@ -237,55 +187,148 @@ sub kind {
 #-----------------------------------------------------------------------
 package Node::Encloser;
 use base 'Node';
-
+Node::Encloser->mk_accessors(qw(brace_kind));
 
 sub _init {
     my ($self, $value) = @_;
 
     if  ($value =~ m/^[])}]$/) {
-        # All set up
+        $self->brace_kind('CLOSER')
     } else {
-        $self->{complete} = 0;
-        $self->{children} = [[]];
-        if ($value eq '[') {
-            $self->{closevalue} = ']';
-        } elsif ($value eq '{') {
-            $self->{closevalue} = '}';
-        } elsif ($value eq '(') {
-            $self->{closevalue} = ')';
-        } else {
-            die "Not a bracket.";
+        $self->complete(FALSE);
+        given ($value){
+            when ('[') { $self->brace_kind('LIST')  }
+            when ('(') { $self->brace_kind('TUPLE') }
+            when ('{') { $self->brace_kind('DICT')  }
+            default    { die "Not a bracket."       }
         }
-    } 
-
-    $self->{value} = $value;
-    
+    }
 }
 
 sub kind {
-    return 'ENCLOSER';
+    my ($self) = @_;
+    return $self->brace_kind;
 }
 
-sub add_child {
+sub _on_event_add_child {
     my ($self, $node) = @_;
+    my $add_child = FALSE;
 
-    my $children = $self->{children};
-    if ($node->signature ~~ ['SEPERATOR|,', 'SEPERATOR|:']){
-        # append new list
-        push @$children, [];
-
-    } elsif ($node->signature eq $self->{closevalue}) {
-        # statement complete
-        $self->{complete} = 1;
-
+    if ($node->kind eq 'COMA_SEPERATOR') {
+        $self->children->new_peg; 
+    } elsif ($node->kind eq 'COLN_SEPERATOR') {
+        $self->children->new_peg;
+        $self->brace_kind('SLICE') if ($self->value eq '[');
+    } elsif ($node->kind eq 'CLOSER') {
+        $self->complete(TRUE);
     } else {
-        # push child onto last list
-        my $exp = @$children[$#$children];
-        push @$exp, $node;
-        $node->_set_parent($self);
+        $add_child = TRUE;
     }
 
+    return $add_child;
 }
+
+#-----------------------------------------------------------------------
+package Node::Call;
+use base 'Node';
+
+sub kind {
+    return 'FUNCTION_CALL';
+}
+
+sub _on_event_add_child {
+    my ($self, $node) = @_;
+    my $add_child = FALSE;
+
+    if ($node->kind eq 'COMA_SEPERATOR') {
+        $self->children->new_peg; 
+    } elsif ($node->kind eq 'CLOSER') {
+        $self->complete = TRUE;
+    } else {
+        $add_child = TRUE;
+    }
+
+    return $add_child;
+}
+
+#-----------------------------------------------------------------------
+package Node::CallInt;
+use base 'Node::Call';
+
+#-----------------------------------------------------------------------
+package Node::CallLen;
+use base 'Node::Call';
+
+#-----------------------------------------------------------------------
+package Node::CallOpen;
+use base 'Node::Call';
+
+#-----------------------------------------------------------------------
+package Node::CallSorted;
+use base 'Node::Call';
+#-----------------------------------------------------------------------
+package Node::CallRange;
+use base 'Node::Call';
+
+#-----------------------------------------------------------------------
+package Node::MethodCall;
+use base 'Node::Call';
+Node::MethodCall->mk_accessors(qw(caller));
+
+sub kind {
+    return 'METHOD_CALL';
+}
+
+sub set_caller {
+    my ($self, $caller) = @_;
+    $self->caller($caller);
+}
+
+#-----------------------------------------------------------------------
+package Node::CallWrite;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallReadline;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallReadlines;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallFileinput;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallAppend;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallPop;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallKeys;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallSplit;
+use base 'Node::MethodCall';
+#-----------------------------------------------------------------------
+package Node::CallJoin;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallMatch;
+use base 'Node::MethodCall';
+#-----------------------------------------------------------------------
+package Node::CallSearch;
+use base 'Node::MethodCall';
+
+#-----------------------------------------------------------------------
+package Node::CallSub;
+use base 'Node::MethodCall';
 
 #-----------------------------------------------------------------------
 package Node::Identifier;
@@ -294,6 +337,18 @@ use base 'Node';
 sub kind {
     return 'IDENTIFIER';
 }
+
+#-----------------------------------------------------------------------
+package Node::Stdout;
+use base 'Node::Identifier';
+
+#-----------------------------------------------------------------------
+package Node::Stdin;
+use base 'Node::Identifier';
+
+#-----------------------------------------------------------------------
+package Node::Argv;
+use base 'Node::Identifier';
 
 #-----------------------------------------------------------------------
 package Node::Indent;
@@ -311,13 +366,20 @@ sub kind {
     return 'IN';
 }
 
-
 #-----------------------------------------------------------------------
 package Node::Logical;
 use base 'Node';
 
 sub kind {
     return 'LOGICAL';
+}
+
+#-----------------------------------------------------------------------
+package Node::Newline;
+use base 'Node';
+
+sub kind {
+    return 'NEWLINE';
 }
 
 #-----------------------------------------------------------------------
@@ -333,7 +395,14 @@ package Node::Seperator;
 use base 'Node';
 
 sub kind {
-    return 'SEPERATOR';
+    my ($self) = @_;
+    my $kind;
+    given($self->value) {
+        when (':') { $kind = 'COLN_SEPERATOR'}
+        when (',') { $kind = 'COMA_SEPERATOR'}
+        when (';') { $kind = 'STMT_SEPERATOR'}
+    }
+    return $kind;
 }
 
 #-----------------------------------------------------------------------
@@ -347,7 +416,6 @@ sub kind {
 sub is_raw {
     my ($self) = @_;
     my $char = substr $self->{value}, 0, 1;
-
     return ($char eq "'");
 }
 #-----------------------------------------------------------------------
@@ -368,60 +436,21 @@ sub kind {
 package Node::Simple;
 use base 'Node';
 
-sub is_simple {
-    return  1;
-}
-
-sub kind {
-    return 'SIMPLE';
-}
-
 sub _init {
     my ($self, $value) = @_;
-    $self->{value} = $value;
-    $self->{complete} = 0;
+    $self->is_simple(TRUE);
+    $self->complete(FALSE);
 }
 
 sub _on_event_add_child {
     my ($self, $node) = @_;
-
-    my $add_child = 1;
-    if ($node->signature eq 'SEPERATOR|,') {
-        $self->_new_child_list;
-
-    } elsif ($node->signature eq 'SEPERATOR|;') {
-        # statement complete
-        $self->{complete} = 1;
+    my $add_child = FALSE;
+    given ($node->kind) {
+        when ('COMA_SEPERATOR') { $self->children->new_peg }
+        when ('STMT_SEPERATOR') { $self->complete(TRUE)    }
+        default                 { $add_child = TRUE        }
     }
     return $add_child;
-}
-
-#-----------------------------------------------------------------------
-package Node::Assignment;
-use base 'Node::Simple';
-
-sub _init {
-    my ($self, $value) = @_;
-    $self->SUPER::_init($value);
-    $self->{complete} = 1;
-}
-
-sub kind {
-    return 'ASSIGNMENT';
-}
-#-----------------------------------------------------------------------
-package Node::Blank;
-use base 'Node::Simple';
-
-
-sub _init {
-    my ($self, $value) = @_;
-    $self->SUPER::_init($value);
-    $self->{complete} = 1;
-}
-
-sub kind {
-    return 'BLANK';
 }
 
 #-----------------------------------------------------------------------
@@ -434,12 +463,11 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Break;
-use base 'Node::Simple';
+use base 'Node';
 
 sub _init {
-    my ($self, $value) = @_;
-    $self->SUPER::_init($value);
-    $self->{complete} = 1;
+    my ($self) = @_;
+    $self->is_simple(TRUE);
 }
 
 sub kind {
@@ -448,13 +476,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Continue;
-use base 'Node::Simple';
-
-sub _init {
-    my ($self, $value) = @_;
-    $self->SUPER::_init($value);
-    $self->{complete} = 1;
-}
+use base 'Node::Break';
 
 sub kind {
     return 'CONTINUE';
@@ -464,10 +486,56 @@ sub kind {
 package Node::Expression;
 use base 'Node::Simple';
 
+#implement as a list of multilists
+#Or .. Create a tuple to store Target lists or entries..
+tuple
+assigment operator
+tuple 
+Assigment operator
+if node is not tuple then create referece.. 
+
+when assimgnet .. check last item is complete or not.. if not complete then complete it with
+tuple.. add... 
+non-tuple non-assigment , check last argument.. . open tuple
+
+
+
 sub kind {
     return 'EXPRESSION';
 }
 
+// overwrite native add_child method!
+
+#method
+     add nontuple...
+        _get_open_tuple.. if none exists. create it.
+     add tuple.. add it like normal
+
+     add assigment.. check to see if open_tuple.. if so close it. then append assigment as normal
+
+     expression nodes are passed the TypeManager. which it then modifies
+
+sub _get_lastitem()     
+
+sub _on_event_add_child {
+    my ($self, $node) = @_;
+
+
+    $self->SUPER::_on_event_add_child($node);
+    
+    my $add_child = FALSE;
+    given ($node->kind) {
+        when ('COMA_SEPERATOR') { $self->{children}->new_peg }
+        when ('STMT_SEPERATOR') { $self->{complete} = TRUE   }
+        when ('ASSIGNMENT')     {  #check to see if assigment has come up previously
+                                   #if not then create Multilist 
+
+                                #TODO
+                                }
+        default                 { $add_child = TRUE          }
+    }
+    return $add_child;
+}
 
 #-----------------------------------------------------------------------
 package Node::Print;
@@ -559,7 +627,7 @@ use base 'Node';
 
 sub _init {
     my ($self) = @_;
-    $self->{complete} = 0;
+    $self->complete(FALSE);
 }
 
 sub kind {
@@ -569,7 +637,7 @@ sub kind {
 sub add_child {
     my ($self, $node) = @_;
     
-    push @{$self->{children}}, $node;
+    push @{$self->children}, $node;
     $node->_set_parent($self);
 
 }
