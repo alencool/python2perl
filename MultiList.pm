@@ -19,6 +19,9 @@ package MultiList;
 use strict;
 use warnings;
 
+use base 'Class::Accessor';
+MultiList->mk_accessors(qw(pegs));
+
 # constructor
 sub new {
     my ($class, @args) = @_;
@@ -30,7 +33,7 @@ sub new {
 # returns number of pegs
 sub get_peg_count {
     my ($self) = @_;
-    return scalar @{$self->{pegs}};
+    return scalar @{$self->pegs};
 }
 
 # append items to peg at peg_index
@@ -43,21 +46,27 @@ sub append_to_peg {
 # append items to last peg
 sub append_to_lastpeg {
     my ($self, @items) = @_;
-    my $lastpeg_idex = $self->get_peg_count - 1;
-    $self->append_to_peg($lastpeg_idex, @items);
+    my $lastpeg_index = $self->get_peg_count - 1;
+    $self->append_to_peg($lastpeg_index, @items);
 }
 
 # creates new peg at end of pegs array
 sub new_peg {
     my ($self) = @_;
-    push @{$self->{pegs}}, [];
+    push @{$self->pegs}, [];
 }
 
 # get peg reference at peg_index
 sub get_peg {
     my ($self, $peg_index) = @_;
-    # my $pegs = $self->_pegs;
-    return @{$self->{pegs}}[$peg_index];
+    my $pegs = $self->pegs;
+    return $$pegs[$peg_index];
+}
+
+# get lastpeg reference
+sub get_lastpeg {
+    my ($self) = @_;
+    return $self->get_peg($self->get_peg_count - 1);
 }
 
 # returns true if single peg with no items
@@ -69,7 +78,7 @@ sub is_empty {
 # returns pegs as a list
 sub get_pegs {
     my ($self) = @_;
-    return (@{$self->{pegs}});
+    return (@{$self->pegs});
 }
 
 1;
