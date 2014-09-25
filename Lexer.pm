@@ -56,7 +56,7 @@ my $re_encloser    = qr/^[][(){}]/;
 my $re_seperator   = qr/^[,:;]/;
 
 # matches a comment
-my $re_comment     = qr/\s*#.*/;
+my $re_comment     = qr/^\s*#.*/;
 
 # matches any whitespace characters
 my $re_whitespace  = qr/^\s*/;
@@ -104,6 +104,7 @@ sub tokenize {
         my $str = $line;            # str will be consumed
         my @token_buffer = ();      # hold nodes incase of error
         my $node;
+        my $comment;
 
         # scan at start for indent
         if ($str =~ /$re_indent/) {
@@ -113,12 +114,15 @@ sub tokenize {
 
         # consume $str and create node nodes.
         while($str) {
-
             $node = $self->_extract_node(\$str);
                 
             if ($node->kind eq 'WHITESPACE') {
                 # ignore any whitespace
                 next;
+            } elsif ($node->kind eq 'COMMENT') {
+                # hold the comment
+                $comment = $node;
+                last;
             } elsif ($node->kind eq 'ERROR') {
                 # return entire line as a comment
                 @token_buffer = (new Node::Comment("#$line"));
@@ -128,14 +132,17 @@ sub tokenize {
             }   
         }
 
+        # remove trailing stmt seperator
+        if ($self->_trailing_stmt_seperator(@token_buffer)) {
+            pop @token_buffer;
+        }
+
+        # add comment and final stmt sepeartor
+        push @token_buffer, $comment if (defined $comment);
+        push @token_buffer, new Node::Seperator(';');
+        
         # push buffer onto nodes list
         push @nodes, @token_buffer;
-
-        # ensure single stmt_sperator at end of line
-        if (not $self->_trailing_stmt_seperator(@token_buffer)) {
-            push @nodes, new Node::Seperator(';');
-        }
-        
     }
 
     $self->{nodes} = \@nodes;
@@ -145,7 +152,6 @@ sub tokenize {
 sub _extract_node {
     my ($self, $str) = @_;
     my ($node, $value);
-
 
     given ($$str) {
         when (/$re_encloser/)   { $node = new Node::Encloser($&);
@@ -210,8 +216,6 @@ sub _extract_node {
     return $node;
 }
 
-
-
 # Create correct node based on identifier
 sub _get_identifier {
     my ($self, $word) = @_;
@@ -249,7 +253,7 @@ sub _get_identifier {
 sub _get_call {
     my ($self, $call) = @_;
     my $node;
-    $call = s/[\s\(]//g;
+    $call =~ s/[\s\(]//g;
     given ($call) {
         when ('int')        { $node = new Node::CallInt }
         when ('len')        { $node = new Node::CallLen }
@@ -297,6 +301,5 @@ sub _get_indent {
 sub _trailing_stmt_seperator {
     return (@_ > 1 and $_[-1]->kind eq 'STMT_SEPERATOR');
 }
-
 
 1;
