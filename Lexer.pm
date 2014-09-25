@@ -3,7 +3,7 @@
 #  Lexer is a class that takes in a list of python code and performs 
 #  lexical analysis, breaking it up into node tokens. 
 #
-#  Created by Alen Bou-Haidar on 19/09/14, edited 24/9/14
+#  Created by Alen Bou-Haidar on 19/09/14, edited 25/9/14
 #
 
 package Lexer;
@@ -16,56 +16,56 @@ use constant KW_ERROR  => qw(del is raise assert from lambda global
                              try class except yield exec finally pass);
 
 # matches the exsistance of indent on a line
-my $re_indent       = qr/(^\s*)[^#\s]/;
+my $re_indent      = qr/(^\s*)[^#\s]/;
 
 # matches a floating point number
-my $re_float        = qr/^[+-]?[0-9]*[.][0-9]*(e[-+]?[0-9]+)?/i;
+my $re_float       = qr/^[+-]?(?=\d+\.|\.\d+)\d*\.\d*(e[-+]?\d+)?/i;
 
 # matches a hexadecimal number
-my $re_hex          = qr/^[+-]?0x[a-f0-9]+/i;
+my $re_hex         = qr/^[+-]?0x[a-f0-9]+/i;
 
 # matches a octal number
-my $re_octal        = qr/^[+-]?0[0-7]*/;
+my $re_octal       = qr/^[+-]?0[0-7]*/;
 
 # matches a decimal number
-my $re_decimal      = qr/^[+-]?[1-9][0-9]*/;
+my $re_decimal     = qr/^[+-]?[1-9][0-9]*/;
 
 # matches assigment operators
 # =   +=    -=    *=    /=    %=    &=    |=    ^=    >>=   <<=   **= 
-my $re_assignment   = qr/^(<<|>>|\*\*|\/|[-+*%&|^])?=/;
+my $re_assignment  = qr/^(<<|>>|\*\*|\/|[-+*%&|^])?=/;
 
 # matches arithmetic operators
 # +   -   *   /   **   %
-my $re_arithmetic   = qr/^(\+|-|\*\*|\*|\/|%)/;
+my $re_arithmetic  = qr/^(\+|-|\*\*|\*|\/|%)/;
 
 # matches bitwise operators
 # <<    >>    &   |   ^   ~
-my $re_bitwise      = qr/^(<<|>>|&|\||\^|~)/;
+my $re_bitwise     = qr/^(<<|>>|&|\||\^|~)/;
 
 # matches comparison operators
 # <   >     <=    >=    ==    !=    <>
-my $re_comparison   = qr/^(<=|>=|==|!=|<>|<|>)/;
+my $re_comparison  = qr/^(<=|>=|==|!=|<>|<|>)/;
 
 # matches regular and raw strings; does not match unicode and multiline
-my $re_string       = qr/^(r?)("|')(?!\2\2)(.*?)(?<!\\)\2/i;
+my $re_string      = qr/^(r?)("|')(?!\2\2)(.*?)(?<!\\)\2/i;
 
 # matches enclosing brackets
-my $re_encloser     = qr/^[][(){}]/;
+my $re_encloser    = qr/^[][(){}]/;
 
 # matches seperator elements
-my $re_seperator    = qr/^[,:;]/;
+my $re_seperator   = qr/^[,:;]/;
 
 # matches a comment
-my $re_comment      = qr/\s*#/;
+my $re_comment     = qr/\s*#.*/;
 
 # matches any whitespace characters
-my $re_whitespace   = qr/^\s*/;
+my $re_whitespace  = qr/^\s*/;
 
 # matches any identifier; does not match a call 
-my $re_identifier   = qr/^(\.?\s*(?!\w+\s*\()[a-z_]\w*\s*)+/i;
+my $re_identifier  = qr/^[a-z_]\w*\s*(\.\s*(?!\w+\s*\()[a-z_]\w*\s*)*/i;
 
 # matches method and function calls
-my $re_call         = qr/^\.\s*[a-z_]\w*\s*\(/i;
+my $re_call        = qr/^\.\s*[a-z_]\w*\s*\(/i;
 
 
 # constructor
@@ -115,6 +115,7 @@ sub tokenize {
         while($str) {
 
             $node = $self->_extract_node(\$str);
+                
             if ($node->kind eq 'WHITESPACE') {
                 # ignore any whitespace
                 next;
@@ -127,14 +128,14 @@ sub tokenize {
             }   
         }
 
-        # remove trailing stmt_seperator
-        if ($self->_trailing_stmt_seperator @token_buffer) {
-            pop @token_buffer;
-        }
-
         # push buffer onto nodes list
         push @nodes, @token_buffer;
-        push @nodes, new Node::Seperator(';');
+
+        # ensure single stmt_sperator at end of line
+        if (not $self->_trailing_stmt_seperator(@token_buffer)) {
+            push @nodes, new Node::Seperator(';');
+        }
+        
     }
 
     $self->{nodes} = \@nodes;
@@ -162,7 +163,7 @@ sub _extract_node {
         when (/$re_decimal/)    { $node = new Node::Number($&);
                                   $$str =~ s/$re_decimal// }
         
-        when (/$re_seperator/)  { $node = new Node::Number($&);
+        when (/$re_seperator/)  { $node = new Node::Seperator($&);
                                   $$str =~ s/$re_seperator// }
         
         when (/$re_assignment/) { $node = new Node::Assignment($&);
@@ -198,7 +199,7 @@ sub _extract_node {
                                   $$str =~ s/$re_call// }
 
         when (/$re_comment/)    { $node = new Node::Comment($$str);
-                                  $$str =~ s/$re_string// }
+                                  $$str =~ s/$re_comment// }
 
         when (/$re_whitespace/) { $node = new Node::Whitespace();
                                   $$str =~ s/$re_whitespace// }
@@ -215,7 +216,7 @@ sub _extract_node {
 sub _get_identifier {
     my ($self, $word) = @_;
     my $node;
-    $word = s/\s//g;
+    $word =~ s/\s//g;
     given ($word) {
         when ('if')         { $node = new Node::If }
         when ('elif')       { $node = new Node::Elif }
@@ -249,7 +250,7 @@ sub _get_call {
     my ($self, $call) = @_;
     my $node;
     $call = s/[\s\(]//g;
-    given ($word) {
+    given ($call) {
         when ('int')        { $node = new Node::CallInt }
         when ('len')        { $node = new Node::CallLen }
         when ('open')       { $node = new Node::CallOpen }
@@ -294,7 +295,7 @@ sub _get_indent {
 
 # return True when a list has a training stmt_seperator
 sub _trailing_stmt_seperator {
-    return (@_ > 1 and @_[-1]->kind eq 'STMT_SEPERATOR')
+    return (@_ > 1 and $_[-1]->kind eq 'STMT_SEPERATOR');
 }
 
 
