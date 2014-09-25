@@ -11,8 +11,7 @@ use strict;
 use warnings;
 use MultiList;
 use feature 'switch';
-use constant TRUE   => 1;
-use constant FALSE  => 0;
+
 
 #-----------------------------------------------------------------------
 #  ___                 _  _         _     
@@ -22,6 +21,7 @@ use constant FALSE  => 0;
 # 
 #-----------------------------------------------------------------------
 package Node;
+use Constants;
 use base 'Class::Accessor';
 Node->mk_accessors(qw(value type comment complete is_compound is_simple 
                       depth parent prev next children ));
@@ -35,11 +35,11 @@ sub new {
                  complete    => TRUE,    # is contents full
                  is_compound => FALSE,   # is compound statement
                  is_simple   => FALSE,   # is simple statement
-                 depth       => 0,       # indentation level
+                 depth       => -1,      # indentation level
                  parent      => undef,   # parent node
                  prev        => undef,   # left sibling
                  next        => undef,   # right sibling
-                 children    => new MultiList }
+                 children    => new MultiList };
 
     my $object = bless $self, $class;
     $self->_init($value);
@@ -186,6 +186,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Encloser;
+use Constants;
 use base 'Node';
 Node::Encloser->mk_accessors(qw(brace_kind));
 
@@ -230,6 +231,7 @@ sub _on_event_add_child {
 
 #-----------------------------------------------------------------------
 package Node::Call;
+use Constants;
 use base 'Node';
 
 sub kind {
@@ -315,6 +317,7 @@ use base 'Node::MethodCall';
 #-----------------------------------------------------------------------
 package Node::CallSplit;
 use base 'Node::MethodCall';
+
 #-----------------------------------------------------------------------
 package Node::CallJoin;
 use base 'Node::MethodCall';
@@ -322,6 +325,7 @@ use base 'Node::MethodCall';
 #-----------------------------------------------------------------------
 package Node::CallMatch;
 use base 'Node::MethodCall';
+
 #-----------------------------------------------------------------------
 package Node::CallSearch;
 use base 'Node::MethodCall';
@@ -434,6 +438,7 @@ sub kind {
 #             |_|                                 
 #-----------------------------------------------------------------------
 package Node::Simple;
+use Constants;
 use base 'Node';
 
 sub _init {
@@ -463,6 +468,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Break;
+use Constants;
 use base 'Node';
 
 sub _init {
@@ -484,55 +490,34 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Expression;
+use Constants;
 use base 'Node::Simple';
-
-#implement as a list of multilists
-#Or .. Create a tuple to store Target lists or entries..
-tuple
-assigment operator
-tuple 
-Assigment operator
-if node is not tuple then create referece.. 
-
-when assimgnet .. check last item is complete or not.. if not complete then complete it with
-tuple.. add... 
-non-tuple non-assigment , check last argument.. . open tuple
-
-
 
 sub kind {
     return 'EXPRESSION';
 }
+#expression nodes are passed the TypeManager. which it then modifies
 
-// overwrite native add_child method!
-
-#method
-     add nontuple...
-        _get_open_tuple.. if none exists. create it.
-     add tuple.. add it like normal
-
-     add assigment.. check to see if open_tuple.. if so close it. then append assigment as normal
-
-     expression nodes are passed the TypeManager. which it then modifies
-
-sub _get_lastitem()     
+# adds child the last open tuple, if none then creates it
+sub _add_to_tuple {
+    my ($self, $node) = @_;
+    my $peg = $self->children->get_peg(0);
+    my $lastitem = $$peg[-1];
+    if (not $lastitem or $lastitem->complete) {
+        $lastitem = new Node::Encloser('(');
+        push @$peg, $lastitem;
+    }
+    $lastitem->add_child($node);
+}
 
 sub _on_event_add_child {
     my ($self, $node) = @_;
-
-
-    $self->SUPER::_on_event_add_child($node);
-    
     my $add_child = FALSE;
     given ($node->kind) {
-        when ('COMA_SEPERATOR') { $self->{children}->new_peg }
-        when ('STMT_SEPERATOR') { $self->{complete} = TRUE   }
-        when ('ASSIGNMENT')     {  #check to see if assigment has come up previously
-                                   #if not then create Multilist 
-
-                                #TODO
-                                }
-        default                 { $add_child = TRUE          }
+        when ('TUPLE')          { $add_child = TRUE }
+        when ('ASSIGNMENT')     { $add_child = TRUE }
+        when ('STMT_SEPERATOR') { $self->complete(TRUE) }
+        default                 { $self->_add_to_tuple($node) }
     }
     return $add_child;
 }
@@ -623,6 +608,7 @@ sub kind {
 #-----------------------------------------------------------------------
 
 package Node::Code;
+use Constants;
 use base 'Node';
 
 sub _init {
