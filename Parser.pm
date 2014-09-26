@@ -11,7 +11,9 @@ package Parser;
 use strict;
 use warnings;
 use Stack;
-use Node;
+use Element;
+use Simple;
+use Compound;
 use Constants;
 
 # constructor

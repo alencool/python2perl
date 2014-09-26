@@ -10,7 +10,9 @@ package Lexer;
 
 use strict;
 use warnings;
-use Node;
+use Element;
+use Simple;
+use Compound;
 use feature 'switch';
 use constant KW_ERROR  => qw(del is raise assert from lambda global 
                              try class except yield exec finally pass);
