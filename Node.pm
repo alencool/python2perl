@@ -121,6 +121,13 @@ sub set_depth {
 }
 
 
+# returns string representation of itself
+sub to_string {
+    my ($self) = @_;
+    return $self->kind;
+}
+
+
 #-----------------------------------------------------------------------
 #  ___ _                   _     _  _         _        
 # | __| |___ _ __  ___ _ _| |_  | \| |___  __| |___ ___
@@ -604,15 +611,23 @@ use base 'Node::Compound';
 
 package Node::Code;
 use Constants;
-use base 'Node';
-
-sub _init {
-    my ($self) = @_;
-    $self->complete(FALSE);
-}
+use base 'Node::Compound';
 
 sub _on_event_add_child {
     return TRUE;
 }
+
+sub to_string {
+    my ($self) = @_;
+    my $peg = $self->children->get_peg(0);
+    my $i = 1;
+    my @strings;
+    for my $child (@$peg) {
+        push @strings, sprintf("%2d. %s", $i++, $child->to_string);
+    }
+
+    return join("\n", @strings);
+}
+
 
 1;

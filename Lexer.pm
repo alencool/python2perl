@@ -3,7 +3,7 @@
 #  Lexer is a class that takes in a list of python code and performs 
 #  lexical analysis, breaking it up into node tokens. 
 #
-#  Created by Alen Bou-Haidar on 19/09/14, edited 25/9/14
+#  Created by Alen Bou-Haidar on 19/09/14, edited 26/9/14
 #
 
 package Lexer;
@@ -112,7 +112,7 @@ sub tokenize {
             push @token_buffer, $node;
         }
 
-        # consume $str and create node nodes.
+        # consume $str and create node tokens.
         while($str) {
             $node = $self->_extract_node(\$str);
                 

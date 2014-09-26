@@ -3,7 +3,7 @@
 #  Defines a Parser class, for the creation of a abstract syntax tree 
 #  like structure from a sequence of node tokens.
 #
-#  Created by Alen Bou-Haidar on 19/09/14, edited 25/9/14
+#  Created by Alen Bou-Haidar on 19/09/14, edited 26/9/14
 #
 
 package Parser;
@@ -89,6 +89,10 @@ sub parse {
             $incomp_stk->push($node);
         }
     }
+
+    # finally reset indent
+    $node = new Node::Indent(0);
+    $check_indent->();
 
     return $root;
 }
