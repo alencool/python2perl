@@ -80,7 +80,7 @@ sub parse {
         $peak = $lexer->peak;
         $top  = $incomp_stk->top;
         
-        if ($peak and $peak->kind eq 'METHOD_CALL') {
+        if ($peak and $peak->kind ~~ ['METHOD_CALL', 'SUBSCRIPT']) {
             $node = $incomp_stk->pop if ($node->kind eq 'CLOSER');
             $peak->set_caller($node);
         } elsif ($node->kind eq 'INDENT') {

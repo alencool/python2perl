@@ -133,5 +133,23 @@ sub indent {
     return ("    " x $self->depth);
 }
 
+# returns nodes joined together by a seperator
+sub join_nodes {
+    my ($self, $nodes, $node_sep) = @_;
+    my @node_strings = map {$_->to_string} @$nodes;
+    return join($node_sep, @node_strings);
+
+}
+
+# returns children joined together by seperators
+sub join_children {
+    my ($self, $peg_sep, $child_sep) = @_;
+    my (@pegs, @peg_strings);
+    $peg_sep = ', ' unless defined $peg_sep;
+    $child_sep = ' ' unless defined $child_sep;
+    @pegs = $self->children->get_pegs;
+    @peg_strings = map {$self->join_nodes($_, $child_sep)} @pegs;
+    return join ($peg_sep, @peg_strings);
+}
 
 1;

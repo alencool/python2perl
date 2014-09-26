@@ -34,10 +34,10 @@ sub _on_event_add_child {
     if ($node->kind eq 'EXPRESSION' and $node->is_leaf) {
         # i.e. empty expression
         my $peg = $self->children->get_peg(0);
-        if (@$peg == 1) {
+        if (scalar @$peg == 1) {
             # first item is conditional
             # dont want one statement to be empty
-            my $add_child = FALSE;
+            $add_child = FALSE;
         }
     }
     return $add_child;
@@ -52,10 +52,9 @@ sub to_string {
     my $peg = $self->children->get_peg(0);
     my @strings;
     my $expr = shift @$peg;
-    my $conditional = $expr->to_string_as_conditional;
+    my $conditional = $expr->join_children;
     my $indent = $self->indent;
-    $name = "Compound" unless defined $name;
-    push @strings, sprintf("$indent%s%s {", $name, $conditional);
+    push @strings, sprintf("$indent%s %s {", $name, $conditional);
     for my $child (@$peg) {
         push @strings, $child->to_string;
     }
@@ -93,7 +92,7 @@ use base 'Node::Compound';
 
 sub to_string {
     my ($self) = @_;
-    return $self->SUPER::to_string('for');
+    return $self->SUPER::to_string('foreach');
 }
 
 #-----------------------------------------------------------------------

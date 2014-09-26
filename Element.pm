@@ -35,6 +35,17 @@ sub kind {
     return 'ARITHMETIC';
 }
 
+sub to_string {
+    my ($self) = @_;
+    #TODO !
+    # check type of siblings
+    # multiplication of string and numbeer (x)
+    # concatination of strings is          (.)
+    # concatination of Lists .. more compex
+
+    return $self->value;
+}
+
 #-----------------------------------------------------------------------
 package Node::Assignment;
 use base 'Node';
@@ -63,7 +74,6 @@ sub kind {
 package Node::Comparison;
 use base 'Node';
 
-
 sub _init {
     my ($self, $value) = @_;
     $self->value('!=') if ($value eq '<>');
@@ -74,69 +84,86 @@ sub kind {
 }
 
 #-----------------------------------------------------------------------
+package Node::Closer;
+use base 'Node';
+
+sub kind {
+    return 'CLOSER';
+}
+
+#-----------------------------------------------------------------------
 package Node::Encloser;
 use Constants;
 use base 'Node';
-Node::Encloser->mk_accessors(qw(brace_kind));
 
 sub _init {
-    my ($self, $value) = @_;
-
-    if  ($value =~ m/^[])}]$/) {
-        $self->brace_kind('CLOSER')
-    } else {
-        $self->complete(FALSE);
-        given ($value){
-            when ('[') { $self->brace_kind('LIST')  }
-            when ('(') { $self->brace_kind('TUPLE') }
-            when ('{') { $self->brace_kind('DICT')  }
-            default    { die "Not a bracket."       }
-        }
-    }
-}
-
-sub kind {
     my ($self) = @_;
-    return $self->brace_kind;
+    $self->complete(FALSE);
 }
 
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
 
-    if ($node->kind eq 'COMA_SEPERATOR') {
-        $self->children->new_peg; 
-    } elsif ($node->kind eq 'COLN_SEPERATOR') {
-        $self->children->new_peg;
-        $self->brace_kind('SLICE') if ($self->value eq '[');
-    } elsif ($node->kind eq 'CLOSER') {
-        $self->complete(TRUE);
-    } else {
-        $add_child = TRUE;
+    given ($node->kind) {
+        when ('COMA_SEPERATOR') { $self->children->new_peg }
+        when ('COLN_SEPERATOR') { $self->children->new_peg }
+        when ('CLOSER')         { $self->complete(TRUE) }
+        default                 { $add_child = TRUE }
     }
 
     return $add_child;
 }
+
 sub to_string {
     my ($self) = @_;
-    my $string;
-    given ($self->brace_kind) {
-        when ('LIST')   { $string = $self->_to_string_list  }
-        when ('TUPLE')  { $string = $self->_to_string_tuple }
-        when ('DICT')   { $string = $self->_to_string_dict  }
-        when ('SLICE')  { $string = $self->_to_string_slice }
-    }
-    return $string;
+    return sprintf("(%s)", $self->join_children());
+
+#-----------------------------------------------------------------------
+package Node::Dict;
+use base 'Node::Encloser';
+
+sub kind {
+    return 'DICT';
 }
 
+#-----------------------------------------------------------------------
+package Node::Tuple;
+use base 'Node::Encloser';
 
-sub _to_string_tuple {
+sub kind {
+    return 'TUPLE';
+}
+
+#-----------------------------------------------------------------------
+package Node::List;
+use base 'Node::Encloser';
+
+sub kind {
+    return 'LIST';
+}
+
+#-----------------------------------------------------------------------
+package Node::Subscript;
+use base 'Node::Encloser';
+Node::Subscript->mk_accessors(qw(caller));
+
+sub set_caller {
+    my ($self, $caller) = @_;
+    $self->caller($caller);
+}
+
+sub kind {
+    return 'SUBSCRIPT';
+}
+
+sub to_string {
     my ($self) = @_;
-    my $peg = $self->children->get_peg(0);
-    my @elements = map {$_->kind} @$peg;
-    my $conditional = join(' ', @elements);
-    $conditional = "($conditional)" if $conditional;
-    return $conditional;
+    #TODO slicing in perl involves the range operator ..
+    # also displaying this may be different if argv is next to it!
+
+
+    return sprintf("[%s]", $self->join_children(':',''));
 }
 
 #-----------------------------------------------------------------------
@@ -162,6 +189,24 @@ sub _on_event_add_child {
 
     return $add_child;
 }
+
+# sub to_string {
+#     my ($self, $name) = @_;
+#     $name = $self->value unless $name;
+
+#     my $peg = $self->children->get_peg(0);
+#     my @strings;
+#     my $expr = shift @$peg;
+#     print $expr;
+#     my $conditional = $expr->join_children;
+#     my $indent = $self->indent;
+#     push @strings, sprintf("$indent%s%s {", $name, $conditional);
+#     for my $child (@$peg) {
+#         push @strings, $child->to_string;
+#     }
+#     push @strings, "$indent}";
+#     return join("\n", @strings);
+# }
 
 #-----------------------------------------------------------------------
 package Node::CallInt;

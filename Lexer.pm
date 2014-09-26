@@ -3,7 +3,7 @@
 #  Lexer is a class that takes in a list of python code and performs 
 #  lexical analysis, breaking it up into node tokens. 
 #
-#  Created by Alen Bou-Haidar on 19/09/14, edited 26/9/14
+#  Created by Alen Bou-Haidar on 19/09/14, edited 27/9/14
 #
 
 package Lexer;
@@ -64,7 +64,7 @@ my $re_comment     = qr/^\s*#.*/;
 my $re_whitespace  = qr/^\s*/;
 
 # matches any identifier; does not match a call 
-my $re_identifier  = qr/^[a-z_]\w*\s*(\.\s*(?!\w+\s*\()[a-z_]\w*\s*)*/i;
+my $re_identifier  = qr/^[a-z_]\w*(\s*\.\s*(?!\w+\s*\()[a-z_]\w*)*/i;
 
 # matches method and function calls
 my $re_call        = qr/^\.\s*[a-z_]\w*\s*\(/i;
@@ -106,8 +106,9 @@ sub tokenize {
         chomp $line;            # remove new lines
         my $str = $line;        # str will be consumed
         my @token_buffer = ();  # hold nodes incase of error
-        my $node;
-        my $comment;
+        my $node;               # current node
+        my $prev_kind;          # previous node kind
+        my $comment;            # comment node
 
         # scan at start for indent
         if ($str =~ /$re_indent/) {
@@ -120,13 +121,13 @@ sub tokenize {
             push @nodes, @blank_buffer;
             @blank_buffer = ();
             $last_indent = $node->value;
-            
+
             push @token_buffer, $node;
         }
 
         # consume $str and create node tokens.
         while($str) {
-            $node = $self->_extract_node(\$str);
+            $node = $self->_extract_node(\$str, $prev_kind);
                 
             if ($node->kind eq 'WHITESPACE') {
                 # ignore any whitespace
@@ -140,6 +141,7 @@ sub tokenize {
                 @token_buffer = (new Node::Comment("#$line"));
                 last;
             } else {
+                $prev_kind = $node->kind;
                 push @token_buffer, $node;
             }   
         }
@@ -161,10 +163,9 @@ sub tokenize {
         # add final stmt sepeartor
         push @token_buffer, new Node::Seperator(';');
         
-        if (@token_buffer[0]->kind ne 'INDENT') {
+        if ($token_buffer[0]->kind ne 'INDENT') {
             push @blank_buffer, @token_buffer;
         } else {
-            # push all buffers onto nodes list
             push @nodes, @token_buffer;
         }
         
@@ -175,13 +176,10 @@ sub tokenize {
 
 # Extracts a token node from $str reference
 sub _extract_node {
-    my ($self, $str) = @_;
+    my ($self, $str, $prev_kind) = @_;
     my ($node, $value);
 
     given ($$str) {
-        when (/$re_encloser/)   { $node = new Node::Encloser($&);
-                                  $$str =~ s/$re_encloser// }
-        
         when (/$re_float/)      { $node = new Node::Number($&);
                                   $$str =~ s/$re_float// }
         
@@ -222,7 +220,10 @@ sub _extract_node {
                                   }
                                   $node = new Node::String($value);
                                   $$str =~ s/$re_string// }
-        
+
+        when (/$re_encloser/)   { $node = $self->_get_encloser($&);
+                                  $$str =~ s/$re_encloser// }
+
         when (/$re_identifier/) { $node = $self->_get_identifier($&);
                                   $$str =~ s/$re_identifier// }
 
@@ -298,6 +299,29 @@ sub _get_call {
         when ('.search')    { $node = new Node::CallSearch }
         when ('.sub')       { $node = new Node::CallSub }
         default             { $node = new Node::Call($call) }
+    }
+
+    return $node;
+}
+
+sub _get_encloser {
+    my ($self, $brace, $prev_kind) = @_;
+    my ($node);
+
+    # choose possible type for '['
+    given ($prev_kind) {
+        when ('IDENTIFIER') { $node = new Node::Subscript }
+        when ('CLOSER')     { $node = new Node::Subscript }
+        default             { $node = new Node::List }
+    }
+
+    # if brace was not '[' node will be set to correct kind
+    given ($brace) {
+        when ('}')          { $node = new Node::Closer }
+        when (')')          { $node = new Node::Closer }
+        when (']')          { $node = new Node::Closer }
+        when ('{')          { $node = new Node::Dict }
+        when ('(')          { $node = new Node::Tuple }
     }
 
     return $node;

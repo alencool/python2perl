@@ -39,6 +39,17 @@ sub _on_event_add_child {
     return $add_child;
 }
 
+sub to_string {
+    my ($self, $name) = @_;
+    my $string = '';
+    $name = $self->value unless defined $name;
+    if (not $self->is_leaf){
+        my $args = $self->join_children;
+        $string = sprintf "%s%s %s;", $self->indent, $name, $args;
+    }
+    return sprintf "%s%s", $string , $self->comment;
+}
+
 #-----------------------------------------------------------------------
 package Node::Invisible;
 use base 'Node::Simple';
@@ -50,6 +61,7 @@ sub to_string {
     my ($self) = @_;
     return $self->comment;
 }
+
 
 #-----------------------------------------------------------------------
 package Node::Break;
@@ -120,6 +132,12 @@ sub to_string_as_conditional {
 #-----------------------------------------------------------------------
 package Node::Print;
 use base 'Node::Simple';
+
+
+sub to_string {
+    my ($self) = @_;
+    return $self->SUPER::to_string('print');
+}
 
 sub kind {
     return 'PRINT';
