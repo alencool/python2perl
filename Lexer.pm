@@ -99,18 +99,28 @@ sub peak {
 # converts a list of lines into node tokens
 sub tokenize {
     my ($self, @lines)  = @_;
-    my @nodes = ();
-
+    my @nodes = ();             # all the token nodes
+    my @blank_buffer;           # buffer of successive blank lines
+    my $last_indent = 0;        # the last known indent value
     for my $line (@lines) {
-        chomp $line;                # remove new lines
-        my $str = $line;            # str will be consumed
-        my @token_buffer = ();      # hold nodes incase of error
+        chomp $line;            # remove new lines
+        my $str = $line;        # str will be consumed
+        my @token_buffer = ();  # hold nodes incase of error
         my $node;
         my $comment;
 
         # scan at start for indent
         if ($str =~ /$re_indent/) {
             $node = $self->_get_indent($str);
+
+            # for pretty whitespace output we adjust indent
+            if ($node->value < $last_indent) {
+                push @nodes, new Node::Indent($node->value);
+            }
+            push @nodes, @blank_buffer;
+            @blank_buffer = ();
+            $last_indent = $node->value;
+            
             push @token_buffer, $node;
         }
 
@@ -151,8 +161,13 @@ sub tokenize {
         # add final stmt sepeartor
         push @token_buffer, new Node::Seperator(';');
         
-        # push buffer onto nodes list
-        push @nodes, @token_buffer;
+        if (@token_buffer[0]->kind ne 'INDENT') {
+            push @blank_buffer, @token_buffer;
+        } else {
+            # push all buffers onto nodes list
+            push @nodes, @token_buffer;
+        }
+        
     }
 
     $self->{nodes} = \@nodes;
