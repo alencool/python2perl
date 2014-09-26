@@ -141,8 +141,8 @@ sub tokenize {
 
         # add comment in corrent spot, so it can be added to a stmt
         if (defined $comment) {
-            if (@token_buffer > 0 and $token_buffer[0]->is_statement) {
-                splice @token_buffer, 1, 0, $comment;
+            if (@token_buffer > 1 and $token_buffer[1]->is_statement) {
+                splice @token_buffer, 2, 0, $comment;
             } else {
                 unshift @token_buffer, $comment;
             }
