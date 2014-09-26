@@ -517,6 +517,7 @@ sub _on_event_add_child {
         when ('TUPLE')          { $add_child = TRUE }
         when ('ASSIGNMENT')     { $add_child = TRUE }
         when ('STMT_SEPERATOR') { $self->complete(TRUE) }
+        when ('COLN_SEPERATOR') { $self->complete(TRUE) }
         default                 { $self->_add_to_tuple($node) }
     }
     return $add_child;
@@ -547,10 +548,28 @@ sub kind {
 #                |_|                                               
 #-----------------------------------------------------------------------
 package Node::Compound;
+use Constants;
 use base 'Node';
 
-sub is_compound {
-    return  1;
+sub _init {
+    my ($self, $value) = @_;
+    $self->is_compound(TRUE);
+    $self->complete(FALSE);
+}
+
+sub _on_event_add_child {
+    my ($self, $node) = @_;
+    my $add_child = TRUE;
+    if ($node->kind eq 'EXPRESSION' and $node->is_leaf) {
+        # i.e. empty expression
+        my $peg = $self->children->get_peg(0);
+        if (@$peg == 1) {
+            # first item is conditional
+            # dont want one statement to be empty
+            my $add_child = FALSE;
+        }
+    }
+    return $add_child;
 }
 
 sub kind {
@@ -561,49 +580,25 @@ sub kind {
 package Node::If;
 use base 'Node::Compound';
 
-sub kind {
-    return 'IF';
-}
-
 #-----------------------------------------------------------------------
 package Node::Elif;
 use base 'Node::Compound';
-
-sub kind {
-    return 'ELIF';
-}
 
 #-----------------------------------------------------------------------
 package Node::Else;
 use base 'Node::Compound';
 
-sub kind {
-    return 'ELSE';
-}
-
 #-----------------------------------------------------------------------
 package Node::For;
 use base 'Node::Compound';
-
-sub kind {
-    return 'FOR';
-}
 
 #-----------------------------------------------------------------------
 package Node::While;
 use base 'Node::Compound';
 
-sub kind {
-    return 'WHILE';
-}
-
 #-----------------------------------------------------------------------
 package Node::Def;
 use base 'Node::Compound';
-
-sub kind {
-    return 'DEF';
-}
 
 #-----------------------------------------------------------------------
 
@@ -616,16 +611,8 @@ sub _init {
     $self->complete(FALSE);
 }
 
-sub kind {
-    return 'CODE';
-}
-
-sub add_child {
-    my ($self, $node) = @_;
-    
-    push @{$self->children}, $node;
-    $node->_set_parent($self);
-
+sub _on_event_add_child {
+    return TRUE;
 }
 
 1;

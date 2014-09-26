@@ -137,8 +137,16 @@ sub tokenize {
             pop @token_buffer;
         }
 
-        # add comment and final stmt sepeartor
-        push @token_buffer, $comment if (defined $comment);
+        # add comment in corrent spot, so it can be added to a stmt
+        if (defined $comment) {
+            if (@token_buffer > 0 and $token_buffer[0]->is_statement) {
+                splice @token_buffer, 1, 0, $comment;
+            } else {
+                unshift @token_buffer, $comment;
+            }
+        }
+
+        # add final stmt sepeartor
         push @token_buffer, new Node::Seperator(';');
         
         # push buffer onto nodes list

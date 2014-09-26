@@ -12,8 +12,7 @@ use strict;
 use warnings;
 use Stack;
 use Node;
-use constant TRUE   => 1;
-use constant FALSE  => 0;
+use Constants;
 
 # constructor
 sub new {
@@ -26,6 +25,7 @@ sub new {
 # returns an tree representation of the code
 sub parse {
     my ($self, $lexer)  = @_;
+    my $root;                       # root node of the tree
     my $node;                       # current node
     my $peak;                       # next node
     my $top;                        # current incomplete node
@@ -40,9 +40,10 @@ sub parse {
             # case we need to push an expression statement first
             $top = new Node::Expression;
             $incomp_stk->push($top);
-        } elsif ( $top->kind eq 'EXPRESSION' and 
-                 $node->kind eq 'COLN_SEPERATOR' and 
-                 $peak->kind ne 'STMT_SEPERATOR') {
+        }
+        if ( $top->kind eq 'EXPRESSION' and
+            $node->kind eq 'COLN_SEPERATOR' and 
+            $peak->kind ne 'STMT_SEPERATOR') {
             # we are at the end of a conditional for a composite stmt
             # and stmt is a one liner so push new indent level 
             $indent_stk->push($indent_stk->top + 4);
@@ -52,7 +53,7 @@ sub parse {
             $incomp_stk->pop;
             $incomp_stk->top->add_child($top);
         }
-    }
+    };
 
     # updates indent and completes compound stmts when required
     my $check_indent = sub {
@@ -63,10 +64,14 @@ sub parse {
             $top = $incomp_stk->pop;
             $incomp_stk->top->add_child($top);
         }
-    } 
+    };
 
-    # Node::Code is the root node of the tree
-    $incomp->push(new Node::Code);
+    # root is incomplete, so push it onto the incomp_stk
+    $root = new Node::Code;
+    $incomp_stk->push($root);
+
+    # push indent level 0
+    $indent_stk->push(0);
 
     while ($lexer->has_next) { 
         $node = $lexer->next;
@@ -75,17 +80,17 @@ sub parse {
         
         if ($peak and $peak->kind eq 'METHOD_CALL') {
             $node = $incomp_stk->pop if ($node->kind eq 'CLOSER');
-            $peak->add_caller($node);
+            $peak->set_caller($node);
         } elsif ($node->kind eq 'INDENT') {
             $check_indent->();
         } elsif ($node->complete) {
-            $add_child->();
+            $add_node->();
         } else {
             $incomp_stk->push($node);
         }
     }
 
-    return $incomp->pop;
+    return $root;
 }
 
 1;
