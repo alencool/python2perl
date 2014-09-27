@@ -89,6 +89,7 @@ sub kind {
 package Node::Expression;
 use Constants;
 use base 'Node::Simple';
+Node::Expression->mk_accessors(qw(targets));
 
 sub kind {
     return 'EXPRESSION';
@@ -96,63 +97,81 @@ sub kind {
 #expression nodes are passed the TypeManager. which it then modifies
 
 # adds child the last open tuple, if none then creates it
-sub _add_to_tuple {
-    my ($self, $node) = @_;
-    my $list = $self->children->get_list(0);
-    my $lastitem = $$list[-1];
-    if (not $lastitem or $lastitem->complete) {
-        $lastitem = new Node::Encloser('(');
-        push @$list, $lastitem;
-    }
-    $lastitem->add_child($node);
+sub _init {
+    my ($self) = @_;
+    $self->SUPER::_init;
+    $self->targets([]);
 }
 
-
-
-sub _replace_multilist {
-    my ($self, $node) = @_;
-
-    $self->children($node->children);
-
-
-    my $list = $self->children->get_list(0);
-    my $lastitem = $$list[-1];
-    if (not $lastitem or $lastitem->complete) {
-        $lastitem = new Node::Encloser('(');
-        push @$list, $lastitem;
+sub to_string {
+    my ($self) = @_;
+    my (@strings, $string);
+    my $node_assigment = TRUE;
+    for my $target (@{$self->targets}) {
+        $node_assigment = !$node_assigment;
+        if ($node_assigment) {
+            #target is a Node::Assigment
+            push @strings, $target->to_string;
+        } else {
+            #target is a multilist
+            $string = $self->join_multilist($target);
+            $string = qq/($string)/ if ($target->list_count > 1);
+            push @strings, $string;
+        }
     }
-    $lastitem->add_child($node);
+    $string = join(' ', @strings);
+    $string = $self->indent.$string.';' if $string;
+    $string .= $self->comment;
+    
+    return $string;
 }
 
-# sub _extract_target_list {
-#     my ($self, $node) = @_;
-#     my $targets = $self->children;
+# output format suitable for a condiional statement
+sub to_string_conditional {
+    my ($self) = @_;
+    my ($multi, $str);
+    $multi = $self->targets->[0];
+    $str = $self->join_multilist($multi);
+    $str = qq/ ($str)/ if $str;
+    return $str;
+}
 
-# }
+sub _extract_target_list {
+    my ($self, $node) = @_;
+    my $children = $self->children;
+  
+    while ($children->is_single) {
+        $node = $children->get_single;
+        if ($node->kind eq 'TUPLE') {
+            $children = $node->children;
+        } else {
+            last;
+        }
+    }
+    push @{$self->targets}, $children;
+}
 
 sub _on_event_add_child {
     my ($self, $node) = @_;
-    my $add_child = FALSE;
-    given ($node->kind) {
-
-        when ('TUPLE')          { $add_child = TRUE }
-        when ('ASSIGNMENT')     { $add_child = TRUE }
-        when ('STMT_SEPERATOR') { $self->complete(TRUE) }
-        when ('COLN_SEPERATOR') { $self->complete(TRUE) }
-        default                 { $self->_add_to_tuple($node) }
+    my $add_child = TRUE;
+    if ($node->kind eq 'ASSIGNMENT') {
+        # transformed to assimgnet statement, extract targets
+        $self->_extract_target_list;
+        $self->children(new MultiList);
+        push @{$self->targets}, $node;
+        $add_child = FALSE
+    } elsif ($node->kind eq 'COMA_SEPERATOR') {
+        # new list for each target expression
+        $self->children->new_list;
+    } elsif ($node->kind ~~ ['STMT_SEPERATOR', 'COLN_SEPERATOR']){
+        # statement completion, extract to target list
+        $self->_extract_target_list;
+        $self->complete(TRUE);
+        $add_child = FALSE;
     }
     return $add_child;
 }
 
-# returns string representation of a conditional expression
-sub to_string_as_conditional {
-    my ($self) = @_;
-    my $list = $self->children->get_list(0);
-    my @elements = map {$_->kind} @$list;
-    my $conditional = join(' ', @elements);
-    $conditional = "($conditional)" if $conditional;
-    return $conditional;
-}
 #-----------------------------------------------------------------------
 package Node::Print;
 use base 'Node::Simple';

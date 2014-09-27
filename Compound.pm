@@ -49,10 +49,10 @@ sub to_string {
     my ($self, $name) = @_;
     my $list = $self->children->get_list(0);
     my @strings;
-    my $exp = $list->[0]->join_children;
+    my $exp = $list->[0]->to_string_conditional;
     my $indent = $self->indent;
     @strings = map {$_->to_string} @$list;
-    splice @strings, 0,1, sprintf("$indent%s (%s) {", $name, $exp);
+    splice @strings, 0,1, sprintf("$indent%s%s {", $name, $exp);
     push @strings, "$indent}";
     return join("\n", @strings);
 }

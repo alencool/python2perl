@@ -104,7 +104,6 @@ sub _init {
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
-
     given ($node->kind) {
         when ('COMA_SEPERATOR') { $self->children->new_list }
         when ('COLN_SEPERATOR') { $self->children->new_list }
@@ -117,7 +116,7 @@ sub _on_event_add_child {
 
 sub to_string {
     my ($self) = @_;
-    return sprintf("(%s)", $self->join_children());
+    return sprintf("%s", $self->join_children());
 }
 
 #-----------------------------------------------------------------------

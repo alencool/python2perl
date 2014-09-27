@@ -33,10 +33,10 @@ sub parse {
     my $top;                        # current incomplete node
     my $incomp_stk = new Stack::;   # stack of incomplete nodes
     my $indent_stk = new Stack::;   # stack tracking changes in indent
-
+    my ($add_node, $check_indent);
 
     # adds node as child to top of incomp_stk
-    my $add_node = sub {
+    $add_node = sub {
         if ($top->is_compound and not $node->is_statement) {
             # compound statments only accept other statments so in this
             # case we need to push an expression statement first
@@ -52,13 +52,14 @@ sub parse {
         }
         $top->add_child($node);
         if ($top->complete) {
-            $incomp_stk->pop;
-            $incomp_stk->top->add_child($top);
+            $node = $incomp_stk->pop;
+            $top = $incomp_stk->top;
+            $add_node->();
         }
     };
 
     # updates indent and completes compound stmts when required
-    my $check_indent = sub {
+    $check_indent = sub {
         my $curr = $node->value;
         $indent_stk->push($curr) if ($curr > $indent_stk->top);
         while ($curr < $indent_stk->top) {
