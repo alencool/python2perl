@@ -23,7 +23,7 @@ use Constants;
 use base 'Node';
 
 sub _init {
-    my ($self, $value) = @_;
+    my ($self) = @_;
     $self->is_compound(TRUE);
     $self->complete(FALSE);
 }
@@ -31,14 +31,12 @@ sub _init {
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = TRUE;
-    if ($node->kind eq 'EXPRESSION' and $node->is_leaf) {
-        # i.e. empty expression
-        my $peg = $self->children->get_peg(0);
-        if (scalar @$peg == 1) {
+    if ($node->kind eq 'EXPRESSION' and 
+        $node->is_leaf              and
+        $self->children->is_single) {
             # first item is conditional
             # dont want one statement to be empty
             $add_child = FALSE;
-        }
     }
     return $add_child;
 }
@@ -49,15 +47,12 @@ sub kind {
 
 sub to_string {
     my ($self, $name) = @_;
-    my $peg = $self->children->get_peg(0);
+    my $list = $self->children->get_list(0);
     my @strings;
-    my $expr = shift @$peg;
-    my $conditional = $expr->join_children;
+    my $exp = $list->[0]->join_children;
     my $indent = $self->indent;
-    push @strings, sprintf("$indent%s %s {", $name, $conditional);
-    for my $child (@$peg) {
-        push @strings, $child->to_string;
-    }
+    @strings = map {$_->to_string} @$list;
+    splice @strings, 0,1, sprintf("$indent%s (%s) {", $name, $exp);
     push @strings, "$indent}";
     return join("\n", @strings);
 }
@@ -119,18 +114,29 @@ package Node::Code;
 use Constants;
 use base 'Node::Compound';
 
+sub _init {
+    my ($self, $node) = @_;
+    $self->SUPER::_init;
+    $node = new Node::Expression;
+    $node->comment(qq'#!/usr/bin/perl -w');
+    $self->children->append($node);
+}
+
 sub _on_event_add_child {
-    return TRUE;
+    my ($self, $node) = @_;
+    my $okay_to_add = TRUE;
+    if ($self->children->is_single) {
+        if ($node->is_leaf and $node->comment =~ /#!/) {
+            $okay_to_add = FALSE;
+        }
+    } 
+    return $okay_to_add;
 }
 
 sub to_string {
     my ($self) = @_;
-    my $peg = $self->children->get_peg(0);
-    my @strings;
-    for my $child (@$peg) {
-        push @strings, $child->to_string;
-    }
-
+    my $list = $self->children->get_list(0);
+    my @strings = map {$_->to_string} @$list;
     return join("\n", @strings);
 }
 

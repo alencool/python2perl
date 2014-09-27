@@ -32,7 +32,7 @@ sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
     given ($node->kind) {
-        when ('COMA_SEPERATOR') { $self->children->new_peg }
+        when ('COMA_SEPERATOR') { $self->children->new_list }
         when ('STMT_SEPERATOR') { $self->complete(TRUE)    }
         default                 { $add_child = TRUE        }
     }
@@ -98,19 +98,43 @@ sub kind {
 # adds child the last open tuple, if none then creates it
 sub _add_to_tuple {
     my ($self, $node) = @_;
-    my $peg = $self->children->get_peg(0);
-    my $lastitem = $$peg[-1];
+    my $list = $self->children->get_list(0);
+    my $lastitem = $$list[-1];
     if (not $lastitem or $lastitem->complete) {
         $lastitem = new Node::Encloser('(');
-        push @$peg, $lastitem;
+        push @$list, $lastitem;
     }
     $lastitem->add_child($node);
 }
+
+
+
+sub _replace_multilist {
+    my ($self, $node) = @_;
+
+    $self->children($node->children);
+
+
+    my $list = $self->children->get_list(0);
+    my $lastitem = $$list[-1];
+    if (not $lastitem or $lastitem->complete) {
+        $lastitem = new Node::Encloser('(');
+        push @$list, $lastitem;
+    }
+    $lastitem->add_child($node);
+}
+
+# sub _extract_target_list {
+#     my ($self, $node) = @_;
+#     my $targets = $self->children;
+
+# }
 
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
     given ($node->kind) {
+
         when ('TUPLE')          { $add_child = TRUE }
         when ('ASSIGNMENT')     { $add_child = TRUE }
         when ('STMT_SEPERATOR') { $self->complete(TRUE) }
@@ -123,8 +147,8 @@ sub _on_event_add_child {
 # returns string representation of a conditional expression
 sub to_string_as_conditional {
     my ($self) = @_;
-    my $peg = $self->children->get_peg(0);
-    my @elements = map {$_->kind} @$peg;
+    my $list = $self->children->get_list(0);
+    my @elements = map {$_->kind} @$list;
     my $conditional = join(' ', @elements);
     $conditional = "($conditional)" if $conditional;
     return $conditional;

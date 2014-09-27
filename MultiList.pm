@@ -3,7 +3,7 @@
 #  Defines a MultiList class, for the simple creation and manipulation
 #  of arrays of lists.
 #       
-#               peg0    peg1    peg2        pegN-1   
+#              list0   list1   list2       listN-1   
 #           -----#-------#-------#--- ... ---#-----------
 #                1       1       1           1
 #                2       2       2           2
@@ -11,7 +11,7 @@
 #                        4                   4
 #                        5
 #
-#  Created by Alen Bou-Haidar on 24/09/14, edited 24/9/14
+#  Created by Alen Bou-Haidar on 24/09/14, edited 27/9/14
 #
 
 package MultiList;
@@ -20,65 +20,80 @@ use strict;
 use warnings;
 
 use base 'Class::Accessor';
-MultiList->mk_accessors(qw(pegs));
+MultiList->mk_accessors(qw(lists));
 
 # constructor
 sub new {
     my ($class, @args) = @_;
-    my $self = { pegs => [[]] };
+    my $self = { lists => [[]] };
     my $object = bless $self, $class;
     return $object;
 }
 
-# returns number of pegs
-sub get_peg_count {
+# returns number of items
+sub item_count {
     my ($self) = @_;
-    return scalar @{$self->pegs};
+    my $total = 0; 
+    foreach my $list (@{$self->lists}) {
+        $total += scalar @$list;
+    }
+    return $total;
 }
 
-# append items to peg at peg_index
-sub append_to_peg {
-    my ($self, $peg_index, @items) = @_;
-    my $peg = $self->get_peg($peg_index);
-    push @$peg, @items;
+# returns number of lists
+sub list_count {
+    my ($self) = @_;
+    return scalar @{$self->lists};
 }
 
-# append items to last peg
-sub append_to_lastpeg {
+# append items to last list
+sub append {
     my ($self, @items) = @_;
-    my $lastpeg_index = $self->get_peg_count - 1;
-    $self->append_to_peg($lastpeg_index, @items);
+    my $list = $self->lists->[-1];
+    push @$list, @items;
 }
 
-# creates new peg at end of pegs array
-sub new_peg {
+# append items to list at list_index
+sub append_at {
+    my ($self, $list_index, @items) = @_;
+    my $list = $self->lists->[$list_index];
+    push @$list, @items;
+}
+
+# creates new list
+sub new_list {
     my ($self) = @_;
-    push @{$self->pegs}, [];
+    push @{$self->lists}, [];
 }
 
-# get peg reference at peg_index
-sub get_peg {
-    my ($self, $peg_index) = @_;
-    my $pegs = $self->pegs;
-    return $$pegs[$peg_index];
+# return list reference at index
+sub get_list {
+    my ($self, $index) = @_;
+    return $self->lists->[$index];
 }
 
-# get lastpeg reference
-sub get_lastpeg {
-    my ($self) = @_;
-    return $self->get_peg($self->get_peg_count - 1);
-}
-
-# returns true if single peg with no items
+# returns true if single list with no items
 sub is_empty {
     my ($self) = @_;
-    return ($self->get_peg_count == 1 and @{$self->get_peg(0)} == 0);
+    return ($self->list_count == 1 and $self->item_count == 0);
 }
 
-# returns pegs as a list
-sub get_pegs {
+# returns true if single list with a single items
+sub is_single {
     my ($self) = @_;
-    return (@{$self->pegs});
+    return ($self->list_count == 1 and $self->item_count == 1);
+}
+
+# return the first item of the first list
+sub get_single {
+    my ($self) = @_;
+    $self->lists->[0][0]
+}
+
+# returns a list of list references
+sub get_lists {
+    my ($self) = @_;
+    return (@{$self->lists});
 }
 
 1;

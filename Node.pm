@@ -65,12 +65,12 @@ sub add_child {
     } elsif (not $self->complete) {
         my $okay_to_add = $self->_on_event_add_child($node);
         if ($okay_to_add){
-            my $lastpeg = $self->children->get_lastpeg;
-            push @$lastpeg, $node;
+            my $list = $self->children->get_list(-1);
+            push @$list, $node;
             $node->parent($self);
             $node->set_depth($self->depth + 1);
-            if (@$lastpeg > 1) {
-                my $prev_node = $$lastpeg[-2];
+            if (@$list > 1) {
+                my $prev_node = $list->[-2];
                 $prev_node->next($node);
                 $node->prev($prev_node);
             }
@@ -113,9 +113,9 @@ sub set_depth {
     $self->depth($depth);
     
     # update child nodes recursively
-    my @pegs = $self->children->get_pegs;
-    for my $peg (@pegs) {
-        for my $child (@$peg) {
+    my @lists = $self->children->get_lists;
+    for my $list (@lists) {
+        for my $child (@$list) {
             $child->set_depth($depth + 1);
         }
     }
@@ -136,20 +136,30 @@ sub indent {
 # returns nodes joined together by a seperator
 sub join_nodes {
     my ($self, $nodes, $node_sep) = @_;
-    my @node_strings = map {$_->to_string} @$nodes;
-    return join($node_sep, @node_strings);
+    my ($string, @node_strings);
+    @node_strings = map {$_->to_string} @$nodes;
+    return  join($node_sep, @node_strings);
 
+}
+
+# returns nodes of multilist joined together by seperators
+# useful for when a node manages multiple multilists
+sub join_multilist {
+    my ($self, $multilist, @list_sep) = @_;
+    my (@lists, @list_strings, $lastitem, $i);
+    $list_sep[0] = $list_sep[0] || ', ';
+    $list_sep[1] = $list_sep[1] || $list_sep[0];
+    @lists = $multilist->get_lists;
+    @list_strings = map {$self->join_nodes($_, ' ')} @lists;
+    $lastitem = pop @list_strings;
+    @list_strings = map {$i = !$i; $_ . $list_sep[!$i]} @list_strings;
+    return join('', (@list_strings, $lastitem));
 }
 
 # returns children joined together by seperators
 sub join_children {
-    my ($self, $peg_sep, $child_sep) = @_;
-    my (@pegs, @peg_strings);
-    $peg_sep = ', ' unless defined $peg_sep;
-    $child_sep = ' ' unless defined $child_sep;
-    @pegs = $self->children->get_pegs;
-    @peg_strings = map {$self->join_nodes($_, $child_sep)} @pegs;
-    return join ($peg_sep, @peg_strings);
+    my ($self, @list_sep) = @_;
+    return $self->join_multilist($self->children, @list_sep);
 }
 
 1;

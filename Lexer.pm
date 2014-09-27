@@ -221,7 +221,8 @@ sub _extract_node {
                                   $node = new Node::String($value);
                                   $$str =~ s/$re_string// }
 
-        when (/$re_encloser/)   { $node = $self->_get_encloser($&);
+        when (/$re_encloser/)   { $node = $self->_get_encloser($&,
+                                                            $prev_kind);
                                   $$str =~ s/$re_encloser// }
 
         when (/$re_identifier/) { $node = $self->_get_identifier($&);
@@ -307,7 +308,6 @@ sub _get_call {
 sub _get_encloser {
     my ($self, $brace, $prev_kind) = @_;
     my ($node);
-
     # choose possible type for '['
     given ($prev_kind) {
         when ('IDENTIFIER') { $node = new Node::Subscript }

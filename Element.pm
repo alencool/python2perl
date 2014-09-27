@@ -106,8 +106,8 @@ sub _on_event_add_child {
     my $add_child = FALSE;
 
     given ($node->kind) {
-        when ('COMA_SEPERATOR') { $self->children->new_peg }
-        when ('COLN_SEPERATOR') { $self->children->new_peg }
+        when ('COMA_SEPERATOR') { $self->children->new_list }
+        when ('COLN_SEPERATOR') { $self->children->new_list }
         when ('CLOSER')         { $self->complete(TRUE) }
         default                 { $add_child = TRUE }
     }
@@ -118,6 +118,7 @@ sub _on_event_add_child {
 sub to_string {
     my ($self) = @_;
     return sprintf("(%s)", $self->join_children());
+}
 
 #-----------------------------------------------------------------------
 package Node::Dict;
@@ -125,6 +126,17 @@ use base 'Node::Encloser';
 
 sub kind {
     return 'DICT';
+}
+
+sub to_string {
+    my ($self) = @_;
+    my $str = $self->join_children(' => ',', ');
+    if ($self->parent->kind ~~ ['LIST', 'DICT']) {
+        $str = qq/{$str}/;
+    } else {
+        $str = qq/($str)/;
+    }
+    return $str;
 }
 
 #-----------------------------------------------------------------------
@@ -143,6 +155,17 @@ sub kind {
     return 'LIST';
 }
 
+sub to_string {
+    my ($self) = @_;
+    my $str = $self->join_children;
+    if ($self->parent->kind ~~ ['LIST', 'DICT']) {
+        $str = qq/[$str]/;
+    } else {
+        $str = qq/($str)/;
+    }
+    return $str;
+}
+
 #-----------------------------------------------------------------------
 package Node::Subscript;
 use base 'Node::Encloser';
@@ -151,6 +174,7 @@ Node::Subscript->mk_accessors(qw(caller));
 sub set_caller {
     my ($self, $caller) = @_;
     $self->caller($caller);
+    $caller->parent($self);
 }
 
 sub kind {
@@ -159,11 +183,11 @@ sub kind {
 
 sub to_string {
     my ($self) = @_;
+    my $str = $self->join_children(':');
     #TODO slicing in perl involves the range operator ..
     # also displaying this may be different if argv is next to it!
-
-
-    return sprintf("[%s]", $self->join_children(':',''));
+    $str = sprintf("%s[%s]", $self->caller->to_string, $str);
+    return $str;
 }
 
 #-----------------------------------------------------------------------
@@ -180,7 +204,7 @@ sub _on_event_add_child {
     my $add_child = FALSE;
 
     if ($node->kind eq 'COMA_SEPERATOR') {
-        $self->children->new_peg; 
+        $self->children->new_list; 
     } elsif ($node->kind eq 'CLOSER') {
         $self->complete = TRUE;
     } else {
@@ -194,14 +218,14 @@ sub _on_event_add_child {
 #     my ($self, $name) = @_;
 #     $name = $self->value unless $name;
 
-#     my $peg = $self->children->get_peg(0);
+#     my $list = $self->children->get_list(0);
 #     my @strings;
-#     my $expr = shift @$peg;
+#     my $expr = shift @$list;
 #     print $expr;
 #     my $conditional = $expr->join_children;
 #     my $indent = $self->indent;
 #     push @strings, sprintf("$indent%s%s {", $name, $conditional);
-#     for my $child (@$peg) {
+#     for my $child (@$list) {
 #         push @strings, $child->to_string;
 #     }
 #     push @strings, "$indent}";
@@ -239,6 +263,7 @@ sub kind {
 sub set_caller {
     my ($self, $caller) = @_;
     $self->caller($caller);
+    $caller->parent($self);
 }
 
 #-----------------------------------------------------------------------
