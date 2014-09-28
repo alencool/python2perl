@@ -17,6 +17,7 @@ use feature 'switch';
 #       |__/|_|        
 #
 #-----------------------------------------------------------------------
+
 package Type;
 use Constants;
 use base 'Class::Accessor';

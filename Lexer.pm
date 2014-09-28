@@ -21,16 +21,16 @@ use constant KW_ERROR  => qw(del is raise assert from lambda global
 my $re_indent      = qr/(^\s*)[^#\s]/;
 
 # matches a floating point number
-my $re_float       = qr/^[+-]?(?=\d+\.|\.\d+)\d*\.\d*(e[-+]?\d+)?/i;
+my $re_float       = qr/^([+-]?)(?=\d+\.|\.\d+)\d*\.\d*(e[-+]?\d+)?/i;
 
 # matches a hexadecimal number
-my $re_hex         = qr/^[+-]?0x[a-f0-9]+/i;
+my $re_hex         = qr/^([+-]?)0x[a-f0-9]+/i;
 
 # matches a octal number
-my $re_octal       = qr/^[+-]?0[0-7]*/;
+my $re_octal       = qr/^([+-])?0[0-7]*/;
 
 # matches a decimal number
-my $re_decimal     = qr/^[+-]?[1-9][0-9]*/;
+my $re_decimal     = qr/^([+-])?[1-9][0-9]*/;
 
 # matches assigment operators
 # =   +=    -=    *=    /=    %=    &=    |=    ^=    >>=   <<=   **= 
@@ -168,8 +168,11 @@ sub tokenize {
         } else {
             push @nodes, @token_buffer;
         }
-        
     }
+
+    # finally reset indent and push remaining blank buffer
+    push @nodes, new Node::Indent(0);
+    push @nodes, @blank_buffer;
 
     $self->{nodes} = \@nodes;
 }
@@ -179,18 +182,25 @@ sub _extract_node {
     my ($self, $str, $prev_kind) = @_;
     my ($node, $value);
 
+    # select node type based on captured sign and previous node kind
+    my $process_number = sub {
+        if ($1 and $prev_kind ne 'ARITHMETIC') {
+            $node = new Node::Arithmetic($1);
+            $$str =~ s/$re_arithmetic//;
+        } else {
+            $node = new Node::Number($&);
+            $$str =~ s/$_[0]//;
+        }
+    };
+
     given ($$str) {
-        when (/$re_float/)      { $node = new Node::Number($&);
-                                  $$str =~ s/$re_float// }
+        when (/$re_float/)      { $process_number->($re_float)  }
         
-        when (/$re_hex/)        { $node = new Node::Number($&);
-                                  $$str =~ s/$re_hex// }
+        when (/$re_hex/)        { $process_number->($re_hex) }
         
-        when (/$re_octal/)      { $node = new Node::Number($&);
-                                  $$str =~ s/$re_octal// }
+        when (/$re_octal/)      { $process_number->($re_octal) }
         
-        when (/$re_decimal/)    { $node = new Node::Number($&);
-                                  $$str =~ s/$re_decimal// }
+        when (/$re_decimal/)    { $process_number->($re_decimal) }
         
         when (/$re_seperator/)  { $node = new Node::Seperator($&);
                                   $$str =~ s/$re_seperator// }

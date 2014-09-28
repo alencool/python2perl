@@ -93,10 +93,6 @@ sub parse {
         }
     }
 
-    # finally reset indent
-    $node = new Node::Indent(0);
-    $check_indent->();
-
     return $root;
 }
 

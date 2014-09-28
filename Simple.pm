@@ -153,13 +153,12 @@ sub _extract_target_list {
 
 sub _on_event_add_child {
     my ($self, $node) = @_;
-    my $add_child = TRUE;
+    my $add_child = FALSE;
     if ($node->kind eq 'ASSIGNMENT') {
         # transformed to assimgnet statement, extract targets
         $self->_extract_target_list;
         $self->children(new MultiList);
         push @{$self->targets}, $node;
-        $add_child = FALSE
     } elsif ($node->kind eq 'COMA_SEPERATOR') {
         # new list for each target expression
         $self->children->new_list;
@@ -167,7 +166,8 @@ sub _on_event_add_child {
         # statement completion, extract to target list
         $self->_extract_target_list;
         $self->complete(TRUE);
-        $add_child = FALSE;
+    } else {
+        $add_child = TRUE;
     }
     return $add_child;
 }

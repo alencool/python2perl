@@ -162,4 +162,52 @@ sub join_children {
     return $self->join_multilist($self->children, @list_sep);
 }
 
+# sub infer_type_from_list {
+#     my ($self, $type_manager @nodes) = @_;
+    
+#     my $reduce_types = sub {
+#         my $reduced = shift;
+#         if (!($reduced->kind ~~ [OPERATION])){
+#             $reduced = $_->infer_type($type_manager);
+#         }
+#         return $reduced;
+#     } 
+
+#     # Step 1. replace non-operation nodes with their infered type
+#     @nodes = map { $reduce_types->($_) } @nodes;
+# }
+
+# BITWISE
+# ARITHMETIC
+# COMPARISON
+# IN
+# LOGICAL
+
+
+# perl
+# @doubles = (1,2,3,4);
+
+# print @doubles;
+# for my $i (@a) {
+
+# }
+
+# urinary ~  
+# **
+# * / 
+
+
+# % x   // to /
+# + -  . (concatinate
+# << >>
+# &
+# ^
+# |
+# < <= > >=
+# !=  ==  eq ne cmp
+# in    ~~   not in   !(  ~~  )
+# not   !
+# and   &&
+# or    ||
+
 1;

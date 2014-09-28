@@ -130,7 +130,7 @@ sub kind {
 sub to_string {
     my ($self) = @_;
     my $str = $self->join_children(' => ',', ');
-    if ($self->parent->kind ~~ ['LIST', 'DICT']) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
         $str = qq/{$str}/;
     } else {
         $str = qq/($str)/;
@@ -157,7 +157,7 @@ sub kind {
 sub to_string {
     my ($self) = @_;
     my $str = $self->join_children;
-    if ($self->parent->kind ~~ ['LIST', 'DICT']) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
         $str = qq/[$str]/;
     } else {
         $str = qq/($str)/;
