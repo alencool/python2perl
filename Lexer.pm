@@ -87,6 +87,7 @@ sub has_next {
 # returns next token, and removes from list
 sub next {
     my $self = shift;
+    # print $self->peak->kind, $self->peak->value, "\n";
     return shift @{$self->{nodes}}; 
 }
 
@@ -147,21 +148,21 @@ sub tokenize {
         }
 
         # remove trailing stmt seperator
-        if ($self->_trailing_stmt_seperator(@token_buffer)) {
-            pop @token_buffer;
+        if (!$self->_trailing_stmt_seperator(@token_buffer)) {
+            push @token_buffer, new Node::Seperator(';');
         }
 
         # add comment in corrent spot, so it can be added to a stmt
-        if (defined $comment) {
+        if ($comment) {
             if (@token_buffer > 1 and $token_buffer[1]->is_statement) {
                 splice @token_buffer, 2, 0, $comment;
+            } elsif (@token_buffer > 1){
+                splice @token_buffer, 1, 0, $comment;
             } else {
                 unshift @token_buffer, $comment;
             }
+        
         }
-
-        # add final stmt sepeartor
-        push @token_buffer, new Node::Seperator(';');
         
         if ($token_buffer[0]->kind ne 'INDENT') {
             push @blank_buffer, @token_buffer;

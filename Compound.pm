@@ -31,7 +31,12 @@ sub _init {
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = TRUE;
-    if ($node->kind eq 'EXPRESSION' and 
+
+    if ($self->is_leaf) {
+        # comment can't be added directely to compounds
+        # since they on accept statments 
+        $self->comment($node->comment);
+    } elsif ($node->kind eq 'EXPRESSION' and 
         $node->is_leaf              and
         $self->children->is_single) {
             # first item is conditional
@@ -52,7 +57,8 @@ sub to_string {
     my $exp = $list->[0]->to_string_conditional;
     my $indent = $self->indent;
     @strings = map {$_->to_string} @$list;
-    splice @strings, 0,1, sprintf("$indent%s%s {", $name, $exp);
+    my $header = sprintf("$indent%s%s {%s", $name, $exp, $self->comment);
+    splice @strings, 0,1, $header;
     push @strings, "$indent}";
     return join("\n", @strings);
 }

@@ -92,7 +92,7 @@ sub parse {
             $incomp_stk->push($node);
         }
     }
-
+    
     return $root;
 }
 

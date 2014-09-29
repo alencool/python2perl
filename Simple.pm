@@ -47,7 +47,7 @@ sub to_string {
         my $args = $self->join_children;
         $string = sprintf "%s%s %s;", $self->indent, $name, $args;
     }
-    return sprintf "%s%s", $string , $self->comment;
+    return $string . $self->comment;
 }
 
 #-----------------------------------------------------------------------
@@ -136,10 +136,10 @@ sub to_string_conditional {
     return $str;
 }
 
+# removes layers of parenthesis and adds multilist to targets list
 sub _extract_target_list {
     my ($self, $node) = @_;
     my $children = $self->children;
-  
     while ($children->is_single) {
         $node = $children->get_single;
         if ($node->kind eq 'TUPLE') {

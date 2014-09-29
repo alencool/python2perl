@@ -21,28 +21,19 @@ use feature 'switch';
 package Type;
 use Constants;
 use base 'Class::Accessor';
-Type->mk_accessors(qw(repr, real));
+Type->mk_accessors(qw(data));
 
 # constructor
 sub new {
-    my ($class, $repr, $real) = @_;
-    my $self = { repr => $repr,   # the type it represents
-                 real => $real }; # the actual value as stored in a node
+    my ($class, $data) = @_;
+    my $self = { data => $data};
     my $object = bless $self, $class;
     return $object;
 }
 
-# returns the truth value of its real
-sub truth {
+sub kind {
     my ($self) = @_;
-    my $truth = FALSE
-    given ($self->repr) {
-        when ('NUMBER') { $truth = TRUE if ($self->real + 0) }
-        when ('STRING') { $truth = TRUE if (length($self->real) > 2) }
-        when ('HASH')   { $truth = TRUE if (%{$self->real}) }
-        when ('ARRAY')  { $truth = TRUE if (@{$self->real}) }
-    }
-    return $truth;
+    return (ref($self->data) ? ref($self->data) : $self->data);
 }
 
 #-----------------------------------------------------------------------
@@ -55,11 +46,13 @@ sub truth {
 #-----------------------------------------------------------------------
 
 package Type::Manager;
+use base 'Class::Accessor';
+Type::Manager->mk_accessors(qw(frames));
 
 # constructor
 sub new {
     my ($class, @args) = @_;
-    my $self = { };
+    my $self = {frames => [{}]};
     my $object = bless $self, $class;
     return $object;
 }
@@ -67,13 +60,34 @@ sub new {
 # returns type from name
 sub get {
     my ($self, $name) = @_;
-    return $self->{$name};
+    my $value = undef;
+    for my $frame (@{$self->frames}) {
+        if ($name ~~ $frame) {
+            $value = $frame->{$name};
+            last;
+        }
+    }
+    return $value;
 }
 
 # stores type for name
 sub set {
     my ($self, $name, $type) = @_;
-    $self->{$name} = $type;
+    my $frame = $self->frames->[0];
+    $frame->{$name} = $type;
 }
+
+# create new stack frame
+sub push_frame {
+    my ($self) = @_;
+    unshift @{$self->frames}, {};
+}
+
+# remove top frame from stack
+sub pop_frame {
+    my ($self) = @_;
+    shift @{$self->frames};
+}
+
 
 1;

@@ -22,6 +22,7 @@ use feature 'switch';
 #-----------------------------------------------------------------------
 package Node;
 use Constants;
+use Type;
 use base 'Class::Accessor';
 Node->mk_accessors(qw(value type comment complete is_compound is_simple 
                       depth parent prev next children ));
@@ -30,8 +31,9 @@ Node->mk_accessors(qw(value type comment complete is_compound is_simple
 sub new {
     my ($class, $value) = @_;
     $value = '' unless defined $value;
+    my $type = new Type('NUMBER');
     my $self = { value       => $value,  # str value to infer kind
-                 type        => undef,   # for use in infering var types
+                 type        => $type,   # for use in infering var types
                  comment     => '',      # possible comment attached
                  complete    => TRUE,    # is contents full
                  is_compound => FALSE,   # is compound statement
@@ -102,11 +104,6 @@ sub is_statement {
     return ($self->is_simple || $self->is_compound);
 }
 
-# attempt to deduce its representive type and return it
-sub infer_type {
-    return undef;
-}
-
 # set node and childrens depth
 sub set_depth {
     my ($self, $depth) = @_;
@@ -162,20 +159,70 @@ sub join_children {
     return $self->join_multilist($self->children, @list_sep);
 }
 
-# sub infer_type_from_list {
-#     my ($self, $type_manager @nodes) = @_;
-    
-#     my $reduce_types = sub {
-#         my $reduced = shift;
-#         if (!($reduced->kind ~~ [OPERATION])){
-#             $reduced = $_->infer_type($type_manager);
-#         }
-#         return $reduced;
-#     } 
 
-#     # Step 1. replace non-operation nodes with their infered type
-#     @nodes = map { $reduce_types->($_) } @nodes;
-# }
+# attempt to deduce its representive type
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    my $multi = $self->children;
+    $self->type($self->infer_type_from_multilist($type_manager, $multi));
+    return $self->type;
+}
+
+# attempt to deduce its representive type from list of nodes
+# - order of importance, hash, list, string the default, number
+sub infer_type_from_list {
+    my ($self, $type_manager, @nodes) = @_;
+    my $type = new Type('NUMBER');
+    for my $node (@nodes) {
+        my $node_t = $node->infer_type($type_manager);
+        if ($node_t->kind eq 'HASH') {
+            $type = $node_t;
+            last;
+        } elsif ($node_t->kind eq 'LIST') {
+            if ($type->kind eq 'LIST') {
+                my @merged = (@{$type->data});
+                push @merged, @{$node_t->data};
+                $type = new Type(\@merged);
+            } else {
+                $type = $node_t;
+            }
+        } elsif ($node_t->kind eq 'STRING' and $type->kind ne 'LIST') {
+            $type = new Type('STRING');
+        }
+    }
+    return $type;
+}
+
+sub infer_type_from_multilist {
+    my ($self, $type_manager, $multi) = @_;
+    my (@types, $type);
+    my @lists = $multi->get_lists;
+
+    for my $list (@lists){
+        if (@$list) {
+            $type = infer_type_from_list($type_manager, @$list);
+            push @types, $type;
+        }
+    }
+    if (@types > 1) {
+        $type = new Type(\@types);
+    } elsif (@types == 1){
+        $type = $types[0];
+    } else {
+        $type = new Type('NUMBER');
+    }
+
+    return $type;
+}
+
+
+# returns prev,next stored types
+sub get_sibling_types {
+    my ($self) = @_;
+    my $prev = ($self->prev && $self->prev->type->kind);
+    my $next = ($self->next && $self->next->type->kind);
+    return ($prev, $next)
+}
 
 # BITWISE
 # ARITHMETIC

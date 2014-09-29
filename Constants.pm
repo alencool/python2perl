@@ -9,10 +9,8 @@ package Constants;
 
 use Exporter 'import';
 
-@EXPORT = qw(TRUE FALSE OPERATION);
+@EXPORT = qw(TRUE FALSE);
 
 use constant TRUE   => 1;
 use constant FALSE  => 0;
-
-use constant OPERATION => qw(BITWISE ARITHMETIC COMPARISON IN LOGICAL);
 1;

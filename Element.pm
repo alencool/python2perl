@@ -9,7 +9,7 @@
 use strict;
 use warnings;
 use feature 'switch';
-
+use Type;
 #-----------------------------------------------------------------------
 #  ___ _                   _     _  _         _        
 # | __| |___ _ __  ___ _ _| |_  | \| |___  __| |___ ___
@@ -17,19 +17,20 @@ use feature 'switch';
 # |___|_\___|_|_|_\___|_||_\__| |_|\_\___/\__,_\___/__/ 
 #
 #-----------------------------------------------------------------------
-
-# Indicates an unrecognised token
-package Node::Error;
+package Node::Element;
+use Constants;
 use base 'Node';
 
-sub kind {
-    return 'ERROR';
+sub infer_type {
+    my ($self) = @_;
+    $self->type(new Type('NUMBER'));
+    return $self->type;
 }
 
 #-----------------------------------------------------------------------
 
 package Node::Arithmetic;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'ARITHMETIC';
@@ -37,18 +38,18 @@ sub kind {
 
 sub to_string {
     my ($self) = @_;
-    #TODO !
-    # check type of siblings
-    # multiplication of string and numbeer (x)
-    # concatination of strings is          (.)
-    # concatination of Lists .. more compex
-
-    return $self->value;
+    my $str = $self->value;
+    my ($prev, $next) = $self->get_sibling_types;
+    if ('STRING' ~~ [$prev, $next]) {
+        $str = 'x' if ($str eq '*');
+        $str = '.' if ($str eq '+');
+    } 
+    return $str;
 }
 
 #-----------------------------------------------------------------------
 package Node::Assignment;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'ASSIGNMENT';
@@ -56,28 +57,39 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Bitwise;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'BITWISE';
 }
 
 #-----------------------------------------------------------------------
-package Node::Comment;
-use base 'Node';
-
-sub kind {
-    return 'COMMENT';
-}
-
-#-----------------------------------------------------------------------
 package Node::Comparison;
-use base 'Node';
+use base 'Node::Element';
 
 sub _init {
     my ($self, $value) = @_;
     $self->value('!=') if ($value eq '<>');
 }
+
+sub to_string {
+    my ($self) = @_;
+    my $str = $self->value;
+    my ($prev, $next) = $self->get_sibling_types;
+
+    if ('STRING' ~~ [$prev, $next]) {
+        given ($str) {
+            when ('<')  { $str = 'lt' }
+            when ('>')  { $str = 'gt' }
+            when ('<=') { $str = 'le' }
+            when ('>=') { $str = 'ge' }
+            when ('==') { $str = 'eq' }
+            when ('!=') { $str = 'ne' }
+        }
+    } 
+    return $str;
+}
+
 
 sub kind {
     return 'COMPARISON';
@@ -85,7 +97,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Closer;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'CLOSER';
@@ -94,7 +106,7 @@ sub kind {
 #-----------------------------------------------------------------------
 package Node::Encloser;
 use Constants;
-use base 'Node';
+use base 'Node::Element';
 
 sub _init {
     my ($self) = @_;
@@ -119,6 +131,16 @@ sub to_string {
     return sprintf("%s", $self->join_children());
 }
 
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    my ($type, $multi);
+    $multi = $self->children;
+    $type = $self->infer_type_from_multilist($type_manager, $multi);
+
+    return $type;
+
+}
+
 #-----------------------------------------------------------------------
 package Node::Dict;
 use base 'Node::Encloser';
@@ -128,9 +150,9 @@ sub kind {
 }
 
 sub to_string {
-    my ($self) = @_;
+    my ($self, $scalar) = @_;
     my $str = $self->join_children(' => ',', ');
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $scalar) {
         $str = qq/{$str}/;
     } else {
         $str = qq/($str)/;
@@ -138,13 +160,27 @@ sub to_string {
     return $str;
 }
 
-#-----------------------------------------------------------------------
-package Node::Tuple;
-use base 'Node::Encloser';
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    my $type;
+    my $dict = {};
+    my @lists = $self->children->get_lists;
+    my $iter = sub { return shift @lists };
 
-sub kind {
-    return 'TUPLE';
+    for (;;) {
+        my $key = $iter->();
+        my $value = $iter->();
+        last unless defined $value;
+        if ($key->[0]->kind ~~ ['NUMBER', 'STRING']) {
+            $key = $key->[0]->value || '_';
+            $type = $self->infer_type_from_list($type_manager, @$value);
+            $dict->{$key} = $type;
+        }
+    }
+    $type = new Type($dict);
+    return $type;
 }
+
 
 #-----------------------------------------------------------------------
 package Node::List;
@@ -155,14 +191,21 @@ sub kind {
 }
 
 sub to_string {
-    my ($self) = @_;
+    my ($self, $scalar) = @_;
     my $str = $self->join_children;
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $scalar) {
         $str = qq/[$str]/;
     } else {
         $str = qq/($str)/;
     }
     return $str;
+}
+#-----------------------------------------------------------------------
+package Node::Tuple;
+use base 'Node::Encloser';
+
+sub kind {
+    return 'TUPLE';
 }
 
 #-----------------------------------------------------------------------
@@ -189,10 +232,19 @@ sub to_string {
     return $str;
 }
 
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    my $type;
+    #TODO
+
+
+    return $type;
+}
+
 #-----------------------------------------------------------------------
 package Node::Call;
 use Constants;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'FUNCTION_CALL';
@@ -315,7 +367,7 @@ use base 'Node::MethodCall';
 
 #-----------------------------------------------------------------------
 package Node::Identifier;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'IDENTIFIER';
@@ -334,16 +386,8 @@ package Node::Argv;
 use base 'Node::Identifier';
 
 #-----------------------------------------------------------------------
-package Node::Indent;
-use base 'Node';
-
-sub kind {
-    return 'INDENT';
-}
-
-#-----------------------------------------------------------------------
 package Node::In;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'IN';
@@ -351,23 +395,15 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Logical;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'LOGICAL';
 }
 
 #-----------------------------------------------------------------------
-package Node::Newline;
-use base 'Node';
-
-sub kind {
-    return 'NEWLINE';
-}
-
-#-----------------------------------------------------------------------
 package Node::Number;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     return 'NUMBER';
@@ -375,7 +411,7 @@ sub kind {
 
 #-----------------------------------------------------------------------
 package Node::Seperator;
-use base 'Node';
+use base 'Node::Element';
 
 sub kind {
     my ($self) = @_;
@@ -401,12 +437,44 @@ sub is_raw {
     my $char = substr $self->{value}, 0, 1;
     return ($char eq "'");
 }
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->type(new Type('STRING'));
+    return $self->type;
+}
+
+#-----------------------------------------------------------------------
+package Node::Indent;
+use base 'Node';
+
+sub kind {
+    return 'INDENT';
+}
+
 #-----------------------------------------------------------------------
 package Node::Whitespace;
 use base 'Node';
 
 sub kind {
     return 'WHITESPACE';
+}
+
+#-----------------------------------------------------------------------
+package Node::Comment;
+use base 'Node';
+
+sub kind {
+    return 'COMMENT';
+}
+
+#-----------------------------------------------------------------------
+# Indicates an unrecognised token
+package Node::Error;
+use base 'Node';
+
+sub kind {
+    return 'ERROR';
 }
 
 1;
