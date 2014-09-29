@@ -32,7 +32,7 @@ sub infer_type {
 package Node::Arithmetic;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'ARITHMETIC';
 }
 
@@ -51,7 +51,7 @@ sub to_string {
 package Node::Assignment;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'ASSIGNMENT';
 }
 
@@ -59,7 +59,7 @@ sub kind {
 package Node::Bitwise;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'BITWISE';
 }
 
@@ -91,7 +91,7 @@ sub to_string {
 }
 
 
-sub kind {
+sub _kind {
     return 'COMPARISON';
 }
 
@@ -99,7 +99,7 @@ sub kind {
 package Node::Closer;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'CLOSER';
 }
 
@@ -145,7 +145,7 @@ sub infer_type {
 package Node::Dict;
 use base 'Node::Encloser';
 
-sub kind {
+sub _kind {
     return 'DICT';
 }
 
@@ -186,7 +186,7 @@ sub infer_type {
 package Node::List;
 use base 'Node::Encloser';
 
-sub kind {
+sub _kind {
     return 'LIST';
 }
 
@@ -204,7 +204,7 @@ sub to_string {
 package Node::Tuple;
 use base 'Node::Encloser';
 
-sub kind {
+sub _kind {
     return 'TUPLE';
 }
 
@@ -219,7 +219,7 @@ sub set_caller {
     $caller->parent($self);
 }
 
-sub kind {
+sub _kind {
     return 'SUBSCRIPT';
 }
 
@@ -246,7 +246,7 @@ package Node::Call;
 use Constants;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'FUNCTION_CALL';
 }
 
@@ -307,7 +307,7 @@ package Node::MethodCall;
 use base 'Node::Call';
 Node::MethodCall->mk_accessors(qw(caller));
 
-sub kind {
+sub _kind {
     return 'METHOD_CALL';
 }
 
@@ -369,8 +369,24 @@ use base 'Node::MethodCall';
 package Node::Identifier;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'IDENTIFIER';
+}
+
+sub to_string {
+    my ($self, $str) = @_;
+    given ($self->type->kind) {
+        when ('HASH')   { $str = '%'.$self->value }
+        when ('ARRAY')  { $str = '@'.$self->value }
+        default         { $str = '$'.$self->value }
+    }
+    return $str;
+}
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->type($type_manager->get($self->value));
+    return $self->type;
 }
 
 #-----------------------------------------------------------------------
@@ -385,11 +401,22 @@ use base 'Node::Identifier';
 package Node::Argv;
 use base 'Node::Identifier';
 
+sub to_string {
+    return '@ARGV'
+}
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->type(new Type([]));
+    return $self->type;
+}
+
+
 #-----------------------------------------------------------------------
 package Node::In;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'IN';
 }
 
@@ -397,7 +424,7 @@ sub kind {
 package Node::Logical;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'LOGICAL';
 }
 
@@ -405,15 +432,35 @@ sub kind {
 package Node::Number;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     return 'NUMBER';
+}
+
+#-----------------------------------------------------------------------
+package Node::String;
+use base 'Node';
+
+sub _kind {
+    return 'STRING';
+}
+
+sub to_string {
+    my ($self) = @_;
+    my $value = $self->value;
+    return qq("$value")
+}
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->type(new Type('STRING'));
+    return $self->type;
 }
 
 #-----------------------------------------------------------------------
 package Node::Seperator;
 use base 'Node::Element';
 
-sub kind {
+sub _kind {
     my ($self) = @_;
     my $kind;
     given($self->value) {
@@ -425,30 +472,10 @@ sub kind {
 }
 
 #-----------------------------------------------------------------------
-package Node::String;
-use base 'Node';
-
-sub kind {
-    return 'STRING';
-}
-
-sub is_raw {
-    my ($self) = @_;
-    my $char = substr $self->{value}, 0, 1;
-    return ($char eq "'");
-}
-
-sub infer_type {
-    my ($self, $type_manager) = @_;
-    $self->type(new Type('STRING'));
-    return $self->type;
-}
-
-#-----------------------------------------------------------------------
 package Node::Indent;
 use base 'Node';
 
-sub kind {
+sub _kind {
     return 'INDENT';
 }
 
@@ -456,7 +483,7 @@ sub kind {
 package Node::Whitespace;
 use base 'Node';
 
-sub kind {
+sub _kind {
     return 'WHITESPACE';
 }
 
@@ -464,7 +491,7 @@ sub kind {
 package Node::Comment;
 use base 'Node';
 
-sub kind {
+sub _kind {
     return 'COMMENT';
 }
 
@@ -473,7 +500,7 @@ sub kind {
 package Node::Error;
 use base 'Node';
 
-sub kind {
+sub _kind {
     return 'ERROR';
 }
 

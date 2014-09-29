@@ -41,20 +41,19 @@ sub _on_event_add_child {
 
 sub to_string {
     my ($self, $name) = @_;
-    my $string = '';
+    my $args = ';';
     $name = $self->value unless defined $name;
     if (not $self->is_leaf){
-        my $args = $self->join_children;
-        $string = sprintf "%s%s %s;", $self->indent, $name, $args;
-    }
-    return $string . $self->comment;
+        $args = sprintf " %s;", $self->join_children;
+    } 
+    return $self->indent.$name.$args.$self->comment;
 }
 
 #-----------------------------------------------------------------------
 package Node::Invisible;
 use base 'Node::Simple';
 
-sub kind {
+sub _kind {
     return 'INVISIBLE';
 }
 sub to_string {
@@ -65,25 +64,11 @@ sub to_string {
 
 #-----------------------------------------------------------------------
 package Node::Break;
-use Constants;
-use base 'Node';
-
-sub _init {
-    my ($self) = @_;
-    $self->is_simple(TRUE);
-}
-
-sub kind {
-    return 'BREAK';
-}
+use base 'Node::Simple';
 
 #-----------------------------------------------------------------------
 package Node::Continue;
-use base 'Node::Break';
-
-sub kind {
-    return 'CONTINUE';
-}
+use base 'Node::Simple';
 
 #-----------------------------------------------------------------------
 package Node::Expression;
@@ -91,7 +76,7 @@ use Constants;
 use base 'Node::Simple';
 Node::Expression->mk_accessors(qw(targets));
 
-sub kind {
+sub _kind {
     return 'EXPRESSION';
 }
 #expression nodes are passed the TypeManager. which it then modifies
@@ -182,7 +167,7 @@ sub to_string {
     return $self->SUPER::to_string('print');
 }
 
-sub kind {
+sub _kind {
     return 'PRINT';
 }
 
@@ -190,7 +175,7 @@ sub kind {
 package Node::Return;
 use base 'Node::Simple';
 
-sub kind {
+sub _kind {
     return 'RETURN';
 }
 

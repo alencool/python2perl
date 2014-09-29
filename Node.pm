@@ -25,15 +25,17 @@ use Constants;
 use Type;
 use base 'Class::Accessor';
 Node->mk_accessors(qw(value type comment complete is_compound is_simple 
-                      depth parent prev next children ));
+                      depth parent prev next children kind subkind));
 
 # constructor
 sub new {
     my ($class, $value) = @_;
     $value = '' unless defined $value;
     my $type = new Type('NUMBER');
-    my $self = { value       => $value,  # str value to infer kind
-                 type        => $type,   # for use in infering var types
+    my $self = { value       => $value,  # str value
+                 kind        => '',      # kind of node
+                 subkind     => '',      # sub-kind of node
+                 type        => $type,   # stored Type object
                  comment     => '',      # possible comment attached
                  complete    => TRUE,    # is contents full
                  is_compound => FALSE,   # is compound statement
@@ -46,6 +48,10 @@ sub new {
 
     my $object = bless $self, $class;
     $self->_init($value);
+    # subclass can define their kind/subkind easily 
+    # by implementing these private methods
+    $self->kind($self->_kind);
+    $self->subkind($self->_subkind);
     return $object;
 }
 
@@ -54,9 +60,14 @@ sub _init {
 
 }
 
-# get node kind
-sub kind {
+# init node kind
+sub _kind {
     return 'NODE';
+}
+
+# init node subkind
+sub _subkind {
+    return '';
 }
 
 # add child node, set its depth, parent and sibling properties

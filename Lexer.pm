@@ -219,16 +219,16 @@ sub _extract_node {
                                   $$str =~ s/$re_comparison// }
         
         when (/$re_string/)     { $value = $3;
+                                  # lets just convert everything to a
+                                  # regular string
                                   if (lc($1) eq 'r') {
-                                       # raw string
-                                       $value = qq('$value');
-                                  } else {
-                                       #escape $ symbols
-                                       $value =~ s/\$/\\\$/g;
-                                       #escape @ symbols
-                                       $value =~ s/@/\\@/g;   
-                                       $value = qq("$value");
+                                       # double \ everything!
+                                       $value =~ s/\\/\\\\/g;
                                   }
+                                  #escape $ symbols
+                                  $value =~ s/\$/\\\$/g;
+                                  #escape @ symbols
+                                  $value =~ s/@/\\@/g;
                                   $node = new Node::String($value);
                                   $$str =~ s/$re_string// }
 
@@ -266,20 +266,20 @@ sub _get_identifier {
         when ('for')        { $node = new Node::For }
         when ('while')      { $node = new Node::While }
         when ('def')        { $node = new Node::Def }
-        when ('return')     { $node = new Node::Return }
-        when ('break')      { $node = new Node::Break }
-        when ('continue')   { $node = new Node::Continue }
+        when ('return')     { $node = new Node::Return('return') }
+        when ('break')      { $node = new Node::Break('last') }
+        when ('continue')   { $node = new Node::Continue('next') }
         when ('print')      { $node = new Node::Print }
-        when ('not')        { $node = new Node::Logical('not') }
-        when ('and')        { $node = new Node::Logical('and') }
-        when ('or')         { $node = new Node::Logical('or') }
+        when ('not')        { $node = new Node::Logical('!') }
+        when ('and')        { $node = new Node::Logical('&&') }
+        when ('or')         { $node = new Node::Logical('||') }
         when ('True')       { $node = new Node::Number('1') }
         when ('False')      { $node = new Node::Number('0') }
-        when ('in')         { $node = new Node::In }
+        when ('in')         { $node = new Node::In('~~') }
         when ('import')     { $node = new Node::Invisible }
         when ('sys.stdout') { $node = new Node::Stdout }
         when ('sys.stdin')  { $node = new Node::Stdin }
-        when ('sys.argv')   { $node = new Node::Argv }
+        when ('sys.argv')   { $node = new Node::Argv('ARGV') }
         when ([KW_ERROR])   { $node = new Node::Error }
         default             { $node = new Node::Identifier($word) }
     }

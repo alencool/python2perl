@@ -46,7 +46,7 @@ sub _on_event_add_child {
     return $add_child;
 }
 
-sub kind {
+sub _kind {
     return 'COMPOUND';
 }
 
@@ -71,6 +71,11 @@ sub to_string {
     my ($self) = @_;
     return $self->SUPER::to_string('if');
 }
+
+sub _kind {
+    return 'IF';
+}
+
 #-----------------------------------------------------------------------
 package Node::Elif;
 use base 'Node::Compound';
@@ -79,6 +84,11 @@ sub to_string {
     my ($self) = @_;
     return $self->SUPER::to_string('elsif');
 }
+
+sub _kind {
+    return 'ELIF';
+}
+
 #-----------------------------------------------------------------------
 package Node::Else;
 use base 'Node::Compound';
@@ -87,6 +97,11 @@ sub to_string {
     my ($self) = @_;
     return $self->SUPER::to_string('else');
 }
+
+sub _kind {
+    return 'ELSE';
+}
+
 #-----------------------------------------------------------------------
 package Node::For;
 use base 'Node::Compound';
@@ -94,6 +109,10 @@ use base 'Node::Compound';
 sub to_string {
     my ($self) = @_;
     return $self->SUPER::to_string('foreach');
+}
+
+sub _kind {
+    return 'FOR';
 }
 
 #-----------------------------------------------------------------------
@@ -105,6 +124,10 @@ sub to_string {
     return $self->SUPER::to_string('while');
 }
 
+sub _kind {
+    return 'WHILE';
+}
+
 #-----------------------------------------------------------------------
 package Node::Def;
 use base 'Node::Compound';
@@ -112,6 +135,10 @@ use base 'Node::Compound';
 sub to_string {
     my ($self) = @_;
     return $self->SUPER::to_string('sub');
+}
+
+sub _kind {
+    return 'DEF';
 }
 
 #-----------------------------------------------------------------------
