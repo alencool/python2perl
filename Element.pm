@@ -140,6 +140,29 @@ sub infer_type {
     return $type;
 
 }
+#-----------------------------------------------------------------------
+package Node::Flat;
+use base 'Node::Encloser';
+
+sub _kind {
+    # special flatten list type of container
+    return 'FLAT';
+}
+
+sub _on_event_add_child {
+    my ($self, $node) = @_;
+    if (!$self->is_leaf) {
+        $self->children->new_list;
+    }
+    return True;
+}
+
+sub to_string {
+    my ($self, $scalar) = @_;
+    my $str = $self->join_children;
+    $str = qq/($str)/;
+    return $str;
+}
 
 #-----------------------------------------------------------------------
 package Node::Dict;
