@@ -33,12 +33,12 @@ my $re_octal       = qr/^([+-])?0[0-7]*/;
 my $re_decimal     = qr/^([+-])?[1-9][0-9]*/;
 
 # matches assigment operators
-# =   +=    -=    *=    /=    %=    &=    |=    ^=    >>=   <<=   **= 
-my $re_assignment  = qr/^(<<|>>|\*\*|\/|[-+*%&|^])?=/;
+# =   +=   -=   *=   /=   %=   //=   &=   |=   ^=   >>=   <<=   **= 
+my $re_assignment  = qr/^(<<|>>|\*\*|\/\/|\/|[-+*%&|^])?=/;
 
 # matches arithmetic operators
-# +   -   *   /   **   %
-my $re_arithmetic  = qr/^(\+|-|\*\*|\*|\/|%)/;
+# +   -   *   /   **   %    //
+my $re_arithmetic  = qr/^(\+|-|\*\*|\/\/|\*|\/|%)/;
 
 # matches bitwise operators
 # <<    >>    &   |   ^   ~

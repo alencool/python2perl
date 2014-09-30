@@ -10,6 +10,7 @@ use strict;
 use warnings;
 use feature 'switch';
 use Type;
+
 #-----------------------------------------------------------------------
 #  ___ _                   _     _  _         _        
 # | __| |___ _ __  ___ _ _| |_  | \| |___  __| |___ ___
@@ -32,6 +33,12 @@ sub infer_type {
 package Node::Arithmetic;
 use base 'Node::Element';
 
+sub _init {
+    my ($self, $value) = @_;
+    $self->value('/') if ($value eq '//');
+}
+
+
 sub _kind {
     return 'ARITHMETIC';
 }
@@ -50,6 +57,11 @@ sub to_string {
 #-----------------------------------------------------------------------
 package Node::Assignment;
 use base 'Node::Element';
+
+sub _init {
+    my ($self, $value) = @_;
+    $self->value('/=') if ($value eq '//=');
+}
 
 sub _kind {
     return 'ASSIGNMENT';
