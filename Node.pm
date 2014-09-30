@@ -12,7 +12,6 @@ use warnings;
 use MultiList;
 use feature 'switch';
 
-
 #-----------------------------------------------------------------------
 #  ___                 _  _         _     
 # | _ ) __ _ ___ ___  | \| |___  __| |___ 
@@ -146,7 +145,11 @@ sub join_nodes {
     my ($self, $nodes, $node_sep) = @_;
     my ($string, @node_strings);
     @node_strings = map {$_->to_string} @$nodes;
-    return  join($node_sep, @node_strings);
+    $string = join($node_sep, @node_strings);
+    #adjust for unary operators
+    $string =~ s/! /!/g;
+    $string =~ s/ ~ / ~/g;
+    return  $string;
 
 }
 
@@ -174,10 +177,43 @@ sub join_children {
 # attempt to deduce its representive type
 sub infer_type {
     my ($self, $type_manager) = @_;
+    $type_manager = new Type::Manager unless defined $type_manager;
     my $multi = $self->children;
     $self->type($self->infer_type_from_multilist($type_manager, $multi));
     return $self->type;
 }
+
+# attempts to contatinate lits using perls list flattening
+sub translate_list_add {
+
+}
+
+# attempts to replace x not in y => !(x in y)
+sub translate_notin {
+    my ($self) = @_;
+    my @lists = $self->children->get_lists;
+
+    for my $list (@lists){
+        for (my $i = 0; $i < @$list; $i++) {
+            if ($list->[$i]->kind eq 'NOT' and 
+                $list->[$i + 1]->kind eq 'IN') {
+                # found 'not in'
+                my @notin = ($list->[$i]);            # operator not
+                my $paren = new Node::Tuple::;
+                $paren->add_child($list->[$i - 1]);   # left operand
+                $paren->add_child($list->[$i + 1]);   # operator in
+                $paren->add_child($list->[$i + 2]);   # right operand
+                push @notin, $paren;
+                splice @$list, $i-1, 4, @notin;
+            }
+        }
+        for my $node (@$list) {
+            $node->translate_notin;
+        }    
+    }
+}
+
+
 
 # attempt to deduce its representive type from list of nodes
 # - order of importance, hash, list, string the default, number

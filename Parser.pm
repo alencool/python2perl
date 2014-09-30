@@ -92,7 +92,11 @@ sub parse {
             $incomp_stk->push($node);
         }
     }
-    
+
+    # Some final modifications to the tree
+    # $root->infer_type;
+    # $root->translate_list_add;
+    $root->translate_notin;
     return $root;
 }
 

@@ -126,11 +126,6 @@ sub _on_event_add_child {
     return $add_child;
 }
 
-sub to_string {
-    my ($self) = @_;
-    return sprintf("%s", $self->join_children());
-}
-
 sub infer_type {
     my ($self, $type_manager) = @_;
     my ($type, $multi);
@@ -139,29 +134,6 @@ sub infer_type {
 
     return $type;
 
-}
-#-----------------------------------------------------------------------
-package Node::Flat;
-use base 'Node::Encloser';
-
-sub _kind {
-    # special flatten list type of container
-    return 'FLAT';
-}
-
-sub _on_event_add_child {
-    my ($self, $node) = @_;
-    if (!$self->is_leaf) {
-        $self->children->new_list;
-    }
-    return True;
-}
-
-sub to_string {
-    my ($self, $scalar) = @_;
-    my $str = $self->join_children;
-    $str = qq/($str)/;
-    return $str;
 }
 
 #-----------------------------------------------------------------------
@@ -173,9 +145,9 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $scalar) = @_;
+    my ($self, $literal) = @_;
     my $str = $self->join_children(' => ',', ');
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $scalar) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $literal) {
         $str = qq/{$str}/;
     } else {
         $str = qq/($str)/;
@@ -214,21 +186,45 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $scalar) = @_;
+    my ($self, $literal) = @_;
     my $str = $self->join_children;
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $scalar) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $literal) {
         $str = qq/[$str]/;
     } else {
         $str = qq/($str)/;
     }
     return $str;
 }
+
+#-----------------------------------------------------------------------
+package Node::Flat;
+use base 'Node::List';
+use Constants;
+
+sub _kind {
+    # special flatten list type of container
+    return 'FLAT';
+}
+
+sub _on_event_add_child {
+    my ($self, $node) = @_;
+    if (!$self->is_leaf) {
+        $self->children->new_list;
+    }
+    return TRUE;
+}
+
 #-----------------------------------------------------------------------
 package Node::Tuple;
 use base 'Node::Encloser';
 
 sub _kind {
     return 'TUPLE';
+}
+
+sub to_string {
+    my ($self) = @_;
+    return sprintf("(%s)", $self->join_children());
 }
 
 #-----------------------------------------------------------------------
@@ -444,11 +440,27 @@ sub _kind {
 }
 
 #-----------------------------------------------------------------------
-package Node::Logical;
+package Node::Not;
 use base 'Node::Element';
 
 sub _kind {
-    return 'LOGICAL';
+    return 'NOT';
+}
+
+#-----------------------------------------------------------------------
+package Node::And;
+use base 'Node::Element';
+
+sub _kind {
+    return 'AND';
+}
+
+#-----------------------------------------------------------------------
+package Node::Or;
+use base 'Node::Element';
+
+sub _kind {
+    return 'OR';
 }
 
 #-----------------------------------------------------------------------

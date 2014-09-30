@@ -18,7 +18,6 @@ package MultiList;
 
 use strict;
 use warnings;
-
 use base 'Class::Accessor';
 MultiList->mk_accessors(qw(lists));
 

@@ -270,9 +270,9 @@ sub _get_identifier {
         when ('break')      { $node = new Node::Break('last') }
         when ('continue')   { $node = new Node::Continue('next') }
         when ('print')      { $node = new Node::Print }
-        when ('not')        { $node = new Node::Logical('!') }
-        when ('and')        { $node = new Node::Logical('&&') }
-        when ('or')         { $node = new Node::Logical('||') }
+        when ('not')        { $node = new Node::Not('!') }
+        when ('and')        { $node = new Node::And('&&') }
+        when ('or')         { $node = new Node::Or('||') }
         when ('True')       { $node = new Node::Number('1') }
         when ('False')      { $node = new Node::Number('0') }
         when ('in')         { $node = new Node::In('~~') }
