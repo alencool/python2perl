@@ -504,6 +504,112 @@ sub infer_type {
 }
 
 #-----------------------------------------------------------------------
+package Node::Sprintf;
+use Constants;
+use base 'Node::Element';
+Node::Sprintf->mk_accessors(qw(fmt));
+
+sub _init {
+    my ($self) = @_;
+    $self->complete(FALSE);
+    $self->fmt(undef);
+}
+
+sub _on_event_add_child {
+    my ($self, $node) = @_;
+    if ($self->fmt) {
+        $self->children->append($node);
+        $self->_peel_multilist;
+        $self->_interpolate_args if ($self->fmt->kind eq 'STRING');
+        $self->complete(TRUE);
+    } else {
+        $self->fmt($node);
+    }
+    return FALSE;
+}
+
+sub to_string {
+    my ($self) = @_;
+    my $str;
+    if ($self->kind eq 'STRING'){
+        $str = '"' . $self->value . '"';
+    } else {
+        my $fmt_str = $self->fmt->to_string;
+        my $args = $self->join_children;
+        $str = "sprintf($fmt_str, $args)";
+    }
+    return $str;
+}
+
+# returns true if successfully appended str
+sub append_to_fmt {
+    my ($self, $str) = @_;
+    my $appended = FALSE;
+    if ($self->fmt->kind eq 'STRING') {
+        $self->fmt->{value} .= $str;
+        $appended = TRUE;
+    }
+    return $appended;
+}
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->type(new Type('STRING'));
+    return $self->type;
+}
+
+sub _kind {
+    return 'SPRINTF';
+}
+
+# where possible interpolate arguments
+# if all arguments interpolated then convert to string node
+sub _interpolate_args {
+    my ($self) = @_;
+
+    # break up fmt into %.* parts
+    my @parts = split(/(%\s*.)/, $self->fmt->value);
+
+    my $new_fmtstr;
+    my @old_args = $self->children->get_lists;
+    my $new_args = new MultiList;
+    my $interpolatable = ['NUMBER', 'STRING', 
+                          'SUBSCRIPT', 'IDENTIFIER'];
+
+    for my $part (@parts) {
+        my ($arg, $kind);
+        if ($part ~~ /%$/ or $part !~ /^%/) {
+            # non-fmt parts
+            $new_fmtstr .= $part;
+            next;
+        }
+        if (($arg = shift @old_args) &&             # defined arg
+            (@$arg == 1) &&                         # single node
+            ($kind = $arg->[0]->kind) &&            # get node kind
+            ($kind ~~ $interpolatable) &&           # correct type
+            ($part ~~ /^%[sd]/)) {                  # simple fmt
+            $new_fmtstr .= $arg->[0]->to_string;
+        } else {
+            if ($arg) {
+                $new_args->new_list unless $new_args->is_empty;
+                $new_args->append(@$arg);
+            }
+            $new_fmtstr .= $part;
+        } 
+    }
+
+    if ($new_args->is_empty) {
+        # we can transform this node into a regular string ^_^
+        $self->value($new_fmtstr);
+        $self->kind('STRING');
+    } else {
+        # we still have arguments, so still a sprintf -_-'
+        $self->children($new_args);
+        $self->fmt(new Node::String($new_fmtstr));
+    }
+}
+
+#-----------------------------------------------------------------------
 package Node::Seperator;
 use base 'Node::Element';
 

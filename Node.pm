@@ -183,6 +183,29 @@ sub infer_type {
     return $self->type;
 }
 
+# attempts to replace % operations on string like nodes with sprintf
+sub translate_sprintf {
+    my ($self) = @_;
+    my @lists = $self->children->get_lists;
+
+    for my $list (@lists) {
+        for (my $i = 0; $i < @$list; $i++) {
+            if ($list->[$i]->kind eq 'ARITHMETIC' and 
+                $list->[$i]->value eq '%' and
+                $list->[$i - 1]->type->kind eq 'STRING') {
+                # found 'fmt_str % args'
+                my $sprintf = new Node::Sprintf::;
+                $sprintf->add_child($list->[$i - 1]);   # fmt string
+                $sprintf->add_child($list->[$i + 1]);   # args
+                splice @$list, $i-1, 3, $sprintf;
+            }
+        }
+        for my $node (@$list) {
+            $node->translate_sprintf;
+        }    
+    }
+}
+
 # attempts to contatinate lits using perls list flattening
 sub translate_list_add {
 
@@ -193,7 +216,7 @@ sub translate_notin {
     my ($self) = @_;
     my @lists = $self->children->get_lists;
 
-    for my $list (@lists){
+    for my $list (@lists) {
         for (my $i = 0; $i < @$list; $i++) {
             if ($list->[$i]->kind eq 'NOT' and 
                 $list->[$i + 1]->kind eq 'IN') {
@@ -260,6 +283,21 @@ sub infer_type_from_multilist {
     }
 
     return $type;
+}
+
+# removes layers of parenthesis from the children multilist
+sub _peel_multilist {
+    my ($self, $node) = @_;
+    my $children = $self->children;
+    while ($children->is_single) {
+        $node = $children->get_single;
+        if ($node->kind eq 'TUPLE') {
+            $children = $node->children;
+        } else {
+            last;
+        }
+    }
+    $self->children($children);
 }
 
 

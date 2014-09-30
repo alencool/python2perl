@@ -121,35 +121,21 @@ sub to_string_conditional {
     return $str;
 }
 
-# removes layers of parenthesis and adds multilist to targets list
-sub _extract_target_list {
-    my ($self, $node) = @_;
-    my $children = $self->children;
-    while ($children->is_single) {
-        $node = $children->get_single;
-        if ($node->kind eq 'TUPLE') {
-            $children = $node->children;
-        } else {
-            last;
-        }
-    }
-    push @{$self->targets}, $children;
-}
-
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
     if ($node->kind eq 'ASSIGNMENT') {
         # transformed to assimgnet statement, extract targets
-        $self->_extract_target_list;
+        $self->_peel_multilist;
+        push @{$self->targets}, ($self->children, $node);
         $self->children(new MultiList);
-        push @{$self->targets}, $node;
     } elsif ($node->kind eq 'COMA_SEPERATOR') {
         # new list for each target expression
         $self->children->new_list;
     } elsif ($node->kind ~~ ['STMT_SEPERATOR', 'COLN_SEPERATOR']){
         # statement completion, extract to target list
-        $self->_extract_target_list;
+        $self->_peel_multilist;
+        push @{$self->targets}, $self->children; #TODO remove this push!
         $self->complete(TRUE);
     } else {
         $add_child = TRUE;
