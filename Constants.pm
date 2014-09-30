@@ -13,4 +13,5 @@ use Exporter 'import';
 
 use constant TRUE   => 1;
 use constant FALSE  => 0;
+
 1;

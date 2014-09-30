@@ -26,15 +26,56 @@ Type->mk_accessors(qw(data));
 # constructor
 sub new {
     my ($class, $data) = @_;
-    my $self = { data => $data};
+    my $self = { data => $data };
     my $object = bless $self, $class;
     return $object;
 }
 
+# type kind of either ARRAY, HASH, STRING or NUMBER
 sub kind {
     my ($self) = @_;
     return (ref($self->data) ? ref($self->data) : $self->data);
 }
+
+# from key or index given return type
+sub query {
+    my ($self, $key) = @_;
+    my $type = new Type('NUMBER');
+    my $data = $self->data;
+
+    # set type from dictionary key
+    my $_dict = sub {
+        if (%$data) {
+            if ($key ~~ $data) {
+                $type = $data->{$key};
+            } else {
+                my @keys = keys(%$a);
+                $type = $data->{$keys[0]};
+            }
+        } 
+    };
+
+    # set type from array index
+    my $_array = sub {
+        if (@$data) {
+            if (defined $data->[$key]) {
+                $type = $data->[$key];
+            } else {
+                $type = $data->[0];
+            }
+        } 
+    };
+
+    given ($self->kind) {
+        when ('NUMBER') { $type = $data }
+        when ('STRING') { $type = $data }
+        when ('ARRAY')  { $_array->() }
+        when ('DICT')   { $_dict->() }
+    }
+
+    return $type;
+}
+
 
 #-----------------------------------------------------------------------
 #  _____               __  __                             

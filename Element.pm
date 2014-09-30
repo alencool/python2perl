@@ -157,9 +157,11 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $literal) = @_;
+    my ($self,$scalar_cxt) = @_;
     my $str = $self->join_children(' => ',', ');
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $literal) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
+        $str = qq/{$str}/;
+    } elsif ($scalar_cxt) {
         $str = qq/{$str}/;
     } else {
         $str = qq/($str)/;
@@ -198,9 +200,11 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $literal) = @_;
+    my ($self, $scalar_cxt) = @_;
     my $str = $self->join_children;
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE'] or $literal) {
+    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
+        $str = qq/[$str]/;
+    } elsif ($scalar_cxt) {
         $str = qq/[$str]/;
     } else {
         $str = qq/($str)/;
@@ -255,11 +259,15 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self) = @_;
+    my ($self, $scalar_cxt) = @_;
     my $str = $self->join_children(':');
     #TODO slicing in perl involves the range operator ..
     # also displaying this may be different if argv is next to it!
     $str = sprintf("%s[%s]", $self->caller->to_string, $str);
+
+
+    # its a slice determine if its a slice of 1 variable or not
+
     return $str;
 }
 

@@ -239,7 +239,7 @@ sub translate_notin {
 
 
 # attempt to deduce its representive type from list of nodes
-# - order of importance, hash, list, string the default, number
+# - order of importance, hash, array, string the default, number
 sub infer_type_from_list {
     my ($self, $type_manager, @nodes) = @_;
     my $type = new Type('NUMBER');
@@ -248,15 +248,15 @@ sub infer_type_from_list {
         if ($node_t->kind eq 'HASH') {
             $type = $node_t;
             last;
-        } elsif ($node_t->kind eq 'LIST') {
-            if ($type->kind eq 'LIST') {
+        } elsif ($node_t->kind eq 'ARRAY') {
+            if ($type->kind eq 'ARRAY') {
                 my @merged = (@{$type->data});
                 push @merged, @{$node_t->data};
                 $type = new Type(\@merged);
             } else {
                 $type = $node_t;
             }
-        } elsif ($node_t->kind eq 'STRING' and $type->kind ne 'LIST') {
+        } elsif ($node_t->kind eq 'STRING' and $type->kind ne 'ARRAY') {
             $type = new Type('STRING');
         }
     }
