@@ -69,6 +69,9 @@ my $re_identifier  = qr/^[a-z_]\w*(\s*\.\s*(?!\w+\s*\()[a-z_]\w*)*/i;
 # matches method and function calls
 my $re_call        = qr/^\.\s*[a-z_]\w*\s*\(/i;
 
+# matches explicit line continuation
+my $re_lncontinue  = qr/^(r?["'].*)?\\$/i;
+
 
 # constructor
 sub new {
@@ -103,13 +106,21 @@ sub tokenize {
     my @nodes = ();             # all the token nodes
     my @blank_buffer;           # buffer of successive blank lines
     my $last_indent = 0;        # the last known indent value
-    for my $line (@lines) {
+
+    # line iterator, used in line continuation
+    my $get_line = sub {
+        my $line = shift @lines;
         chomp $line;            # remove new lines
+        return $line;
+    }
+
+    while (my $line = $get_line->()) {
         my $str = $line;        # str will be consumed
         my @token_buffer = ();  # hold nodes incase of error
         my $node;               # current node
         my $prev_kind;          # previous node kind
         my $comment;            # comment node
+        my $brace_stk = [0];    # if not 0, pull up next line
 
         # scan at start for indent
         if ($str =~ /$re_indent/) {
@@ -128,7 +139,7 @@ sub tokenize {
 
         # consume $str and create node tokens.
         while($str) {
-            $node = $self->_extract_node(\$str, $prev_kind);
+            $node = $self->_extract_node(\$str, $prev_kind, $brace_stk);
                 
             if ($node->kind eq 'WHITESPACE') {
                 # ignore any whitespace
@@ -141,10 +152,19 @@ sub tokenize {
                 # return entire line as a comment
                 @token_buffer = (new Node::Comment("#$line"));
                 last;
+            } elsif ($node->kind eq 'LNCONTINUE') {
+                # line continuation
+                chop($str); # remove the \ character
+                $str .= $get_line->();
             } else {
                 $prev_kind = $node->kind;
                 push @token_buffer, $node;
-            }   
+            }
+
+            if (!$str and $brace_stk->[0]) {
+                # unbalanced braces, pull up new line
+                $str .= $get_line->();
+            }
         }
 
         # remove trailing stmt seperator
@@ -180,7 +200,7 @@ sub tokenize {
 
 # Extracts a token node from $str reference
 sub _extract_node {
-    my ($self, $str, $prev_kind) = @_;
+    my ($self, $str, $prev_kind, $brace_stk) = @_;
     my ($node, $value);
 
     # select node type based on captured sign and previous node kind
@@ -233,22 +253,25 @@ sub _extract_node {
                                   $$str =~ s/$re_string// }
 
         when (/$re_encloser/)   { $node = $self->_get_encloser($&,
-                                                            $prev_kind);
+                                                $prev_kind, $brace_stk);
                                   $$str =~ s/$re_encloser// }
 
         when (/$re_identifier/) { $node = $self->_get_identifier($&);
                                   $$str =~ s/$re_identifier// }
 
         when (/$re_call/)       { $node = $self->_get_call($&);
-                                  $$str =~ s/$re_call// }
+                                  $$str =~ s/$re_call//;
+                                  $brace_stk->[0]++ }
 
         when (/$re_comment/)    { $node = new Node::Comment($$str);
                                   $$str =~ s/$re_comment// }
 
-        when (/$re_whitespace/) { $node = new Node::Whitespace();
+        when (/$re_whitespace/) { $node = new Node::Whitespace;
                                   $$str =~ s/$re_whitespace// }
 
-        default                 { $node = new Node::Error() }
+        when (/$re_lncontinue/) { $node = new Node::Lncontinue }
+
+        default                 { $node = new Node::Error }
     }
 
     return $node;
@@ -317,7 +340,7 @@ sub _get_call {
 }
 
 sub _get_encloser {
-    my ($self, $brace, $prev_kind) = @_;
+    my ($self, $brace, $prev_kind, $brace_stk) = @_;
     my ($node);
     # choose possible type for '['
     given ($prev_kind) {
@@ -334,6 +357,9 @@ sub _get_encloser {
         when ('{')          { $node = new Node::Dict }
         when ('(')          { $node = new Node::Tuple }
     }
+    
+    # update our open/close brace tally
+    $brace_stk->[0] += ($node->kind eq 'CLOSER') ? -1 : 1;
 
     return $node;
 }

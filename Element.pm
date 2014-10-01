@@ -159,9 +159,10 @@ sub _kind {
 sub to_string {
     my ($self,$scalar_cxt) = @_;
     my $str = $self->join_children(' => ',', ');
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
-        $str = qq/{$str}/;
-    } elsif ($scalar_cxt) {
+    if (not defined $scalar_cxt) {
+        $scalar_cxt = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
+    }
+    if ($scalar_cxt) {
         $str = qq/{$str}/;
     } else {
         $str = qq/($str)/;
@@ -202,9 +203,10 @@ sub _kind {
 sub to_string {
     my ($self, $scalar_cxt) = @_;
     my $str = $self->join_children;
-    if ($self->parent->kind ~~ ['LIST', 'DICT', 'TUPLE']) {
-        $str = qq/[$str]/;
-    } elsif ($scalar_cxt) {
+    if (not defined $scalar_cxt) {
+        $scalar_cxt = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
+    }
+    if ($scalar_cxt) {
         $str = qq/[$str]/;
     } else {
         $str = qq/($str)/;
@@ -246,6 +248,7 @@ sub to_string {
 #-----------------------------------------------------------------------
 package Node::Subscript;
 use base 'Node::Encloser';
+use Constants;
 Node::Subscript->mk_accessors(qw(caller));
 
 sub set_caller {
@@ -260,24 +263,174 @@ sub _kind {
 
 sub to_string {
     my ($self, $scalar_cxt) = @_;
-    my $str = $self->join_children(':');
-    #TODO slicing in perl involves the range operator ..
-    # also displaying this may be different if argv is next to it!
-    $str = sprintf("%s[%s]", $self->caller->to_string, $str);
+    my $cl_scalar = $self->caller->to_string(TRUE);
+    my $cl_nonsca = $self->caller->to_string(FALSE);
+    my $cl_kind   = $self->caller->kind;
+    my $signature = $self->_get_signature;
+    my $str;
+    if ($self->is_slice) {
+        $str = "$cl_nonsca[$signature]"
+        $str = "\@{$cl_scalar}[$signature]" if $cl_kind eq 'SUBSCRIPT';
+        $str = "[$str]" if ($scalar_cxt);
+    } else { 
+        if ($caller->type->kind eq 'HASH') {
+            $str = "$cl_scalar{$signature}"
+            $str = "$cl_scalar->{$signature}" if $cl_kind eq 'DICT';
+        } else {
+            $str = "$cl_scalar[$signature]";
+            $str = "$cl_nonsca[$signature]" if $cl_kind eq 'LIST';
+        }
+        if (not $scalar_cxt) {
+            given ($self->type->kind) {
+                when ('ARRAY')  { $str = "\@{$str}" }
+                when ('HASH')   { $str = "%{$str}" }
+            }
+        }
+    }
+
+    return $str;
+}
+
+sub _get_signature {
+    my ($self) = @_;
+    my $python_sig = $self->join_children(':');
+    my $perl_sig;
+
+    # [i:j] with index k such that i <= k < j. 
+    # i:j  => i .. j-1
+    my $i = $self->children->get_list(0);
+    my $j = $self->children->get_list(1);
+
+    if ($self->caller->kind eq 'IDENTIFIER' and  
+        $self->caller->value eq 'ARGV') {
+        
+        if ($python_sig eq '1:'){
+            # special case where we can drop the slice
+            $perl_sig = '';
+        } else {
+            # perls argv missing $0, so -1 to i and j
+
+        }
+    } else {
+
+    }
+    existance is checked sys.argv , and -1 is added
+                            sys.argv[1:] is just @ARGV
 
 
-    # its a slice determine if its a slice of 1 variable or not
+}
 
+# returns a modified 'exp' list, by subtracting -1
+sub _nodes_minus_one {
+    my ($self, $nodes) = @_;
+    @nodes = @$nodes;   #make a copy
+    my $value;
+    if ($nodes[$i]->kind eq 'NUMBER') {
+        $value = $nodes[$i]->value;
+        shift @nodes;
+    } else  {
+        for (my $i = 1; $i < @nodes; $i++) {
+            if ($nodes[$i]->kind eq 'NUMBER' and 
+                $nodes[$i-1]->value ~~ ['+', '-']) {
+                #[+-]Number
+                $value = $nodes[$i-1]->value . $nodes[$i]->value;
+                splice @nodes, $i-1, 2;
+                last;
+            }
+        }
+    }
+
+    $value .= '-1';
+    $value = eval()
+    if (not $modified) {
+        push @nodes, new Node::Arithmetic('-');
+        push @nodes, new Node::Number(-1);
+    }
+
+    return [@nodes];
+
+}
+
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    if ($self->is_slice) {
+        #figure out if slice of 1 , or 
+    }
+    my $caller_type = $self->caller->infer_type($type_manager);
+
+    #TODO
+
+
+    return $type;
+}
+
+sub is_slice {
+    my ($self) = @_;
+    return ($self->children->list_count > 1)
+}
+
+sub imply_type {
+    my ($self, $type_manager, $type) = @_;
+    if ($self->is_slice) {
+        return;
+    }
+    $self->type($type);
+    $type_manager->set($self->value, $type);
+}
+
+#-----------------------------------------------------------------------
+package Node::Identifier;
+use base 'Node::Element';
+
+sub _kind {
+    return 'IDENTIFIER';
+}
+
+sub to_string {
+    my ($self, $scalar_cxt) = @_;
+    my $str = '$'.$self->value;
+    if (!$scalar_cxt) {
+        given ($self->type->kind) {
+            when ('HASH')   { $str = '%'.$self->value }
+            when ('ARRAY')  { $str = '@'.$self->value }
+        }        
+    }
     return $str;
 }
 
 sub infer_type {
     my ($self, $type_manager) = @_;
-    my $type;
-    #TODO
+    $self->type($type_manager->get($self->value));
+    return $self->type;
+}
 
+sub imply_type {
+    my ($self, $type_manager, $type) = @_;
+    $self->type($type);
+    $type_manager->set($self->value, $type);
+}
 
-    return $type;
+#-----------------------------------------------------------------------
+package Node::Stdout;
+use base 'Node::Identifier';
+
+#-----------------------------------------------------------------------
+package Node::Stdin;
+use base 'Node::Identifier';
+
+#-----------------------------------------------------------------------
+package Node::Argv;
+use base 'Node::Identifier';
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    # ARGV's type is an array of string types
+    $self->type(new Type([new Type('STRING')]));
+    return $self->type;
+}
+
+sub imply_type {
 }
 
 #-----------------------------------------------------------------------
@@ -403,53 +556,6 @@ use base 'Node::MethodCall';
 #-----------------------------------------------------------------------
 package Node::CallSub;
 use base 'Node::MethodCall';
-
-#-----------------------------------------------------------------------
-package Node::Identifier;
-use base 'Node::Element';
-
-sub _kind {
-    return 'IDENTIFIER';
-}
-
-sub to_string {
-    my ($self, $str) = @_;
-    given ($self->type->kind) {
-        when ('HASH')   { $str = '%'.$self->value }
-        when ('ARRAY')  { $str = '@'.$self->value }
-        default         { $str = '$'.$self->value }
-    }
-    return $str;
-}
-
-sub infer_type {
-    my ($self, $type_manager) = @_;
-    $self->type($type_manager->get($self->value));
-    return $self->type;
-}
-
-#-----------------------------------------------------------------------
-package Node::Stdout;
-use base 'Node::Identifier';
-
-#-----------------------------------------------------------------------
-package Node::Stdin;
-use base 'Node::Identifier';
-
-#-----------------------------------------------------------------------
-package Node::Argv;
-use base 'Node::Identifier';
-
-sub to_string {
-    return '@ARGV'
-}
-
-sub infer_type {
-    my ($self, $type_manager) = @_;
-    $self->type(new Type([]));
-    return $self->type;
-}
-
 
 #-----------------------------------------------------------------------
 package Node::In;
@@ -646,6 +752,14 @@ use base 'Node';
 
 sub _kind {
     return 'WHITESPACE';
+}
+
+#-----------------------------------------------------------------------
+package Node::Lncontinue;
+use base 'Node';
+
+sub _kind {
+    return 'LNCONTINUE';
 }
 
 #-----------------------------------------------------------------------

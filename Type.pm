@@ -67,8 +67,7 @@ sub query {
     };
 
     given ($self->kind) {
-        when ('NUMBER') { $type = $data }
-        when ('STRING') { $type = $data }
+        when ('STRING') { $type = $self }
         when ('ARRAY')  { $_array->() }
         when ('DICT')   { $_dict->() }
     }

@@ -236,8 +236,6 @@ sub translate_notin {
     }
 }
 
-
-
 # attempt to deduce its representive type from list of nodes
 # - order of importance, hash, array, string the default, number
 sub infer_type_from_list {
