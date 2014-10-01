@@ -157,12 +157,12 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self,$scalar_cxt) = @_;
+    my ($self, $as_scalar) = @_;
     my $str = $self->join_children(' => ',', ');
-    if (not defined $scalar_cxt) {
-        $scalar_cxt = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
+    if (not defined $as_scalar) {
+        $as_scalar = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
     }
-    if ($scalar_cxt) {
+    if ($as_scalar) {
         $str = qq/{$str}/;
     } else {
         $str = qq/($str)/;
@@ -201,12 +201,12 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $scalar_cxt) = @_;
+    my ($self, $as_scalar) = @_;
     my $str = $self->join_children;
-    if (not defined $scalar_cxt) {
-        $scalar_cxt = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
+    if (not defined $as_scalar) {
+        $as_scalar = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
     }
-    if ($scalar_cxt) {
+    if ($as_scalar) {
         $str = qq/[$str]/;
     } else {
         $str = qq/($str)/;
@@ -262,31 +262,37 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $scalar_cxt) = @_;
+    my ($self, $as_scalar) = @_;
+    my $cl_kind   = $self->caller->kind;
+    my $cl_name  = '$'.$self->caller->value;
     my $cl_scalar = $self->caller->to_string(TRUE);
     my $cl_nonsca = $self->caller->to_string(FALSE);
-    my $cl_kind   = $self->caller->kind;
     my $signature = $self->_get_signature;
     my $str;
-    if ($self->is_slice) {
-        $str = "$cl_nonsca[$signature]"
+    if (not $signature) {
+        $str = $as_scalar ? $cl_scalar : $cl_nonsca;
+    } elsif ($self->is_slice) 
+        $str = "$cl_nonsca[$signature]";
         $str = "\@{$cl_scalar}[$signature]" if $cl_kind eq 'SUBSCRIPT';
-        $str = "[$str]" if ($scalar_cxt);
+        $str = "[$str]" if ($as_scalar);
     } else { 
         if ($caller->type->kind eq 'HASH') {
-            $str = "$cl_scalar{$signature}"
+            $str = "$cl_scalar{$signature}";
             $str = "$cl_scalar->{$signature}" if $cl_kind eq 'DICT';
+            $str = "$cl_name{$signature}" if $cl_kind eq 'IDENTIFIER';
         } else {
             $str = "$cl_scalar[$signature]";
             $str = "$cl_nonsca[$signature]" if $cl_kind eq 'LIST';
+            $str = "$cl_name[$signature]" if $cl_kind eq 'IDENTIFIER';
         }
-        if (not $scalar_cxt) {
+        if (not $as_scalar) {
             given ($self->type->kind) {
                 when ('ARRAY')  { $str = "\@{$str}" }
                 when ('HASH')   { $str = "%{$str}" }
             }
         }
     }
+
 
     return $str;
 }
@@ -297,86 +303,85 @@ sub _get_signature {
     my $perl_sig;
 
     # [i:j] with index k such that i <= k < j. 
-    # i:j  => i .. j-1
+    # => i .. j-1
     my $i = $self->children->get_list(0);
     my $j = $self->children->get_list(1);
 
+    # consider no i, and shifted j
+    push @$i, new Node::Number(0) unless @$i > 0;
+    $j = $self->_nodes_minus_one($j) if $j;
+
     if ($self->caller->kind eq 'IDENTIFIER' and  
         $self->caller->value eq 'ARGV') {
-        
+        # consider the case of ARGV
         if ($python_sig eq '1:'){
             # special case where we can drop the slice
             $perl_sig = '';
         } else {
             # perls argv missing $0, so -1 to i and j
-
+            $i = $self->_nodes_minus_one($i);
+            $j = $self->_nodes_minus_one($j) if $j;
+            $perl_sig  = $self._join_nodes($i, ' ');
+            $perl_sig .= '..' if $j;
+            $perl_sig .= $self._join_nodes($j, ' ') if $j;
+            $perl_sig .= "\$#ARGV" if $j and @$j == 0;
         }
     } else {
-
-    }
-    existance is checked sys.argv , and -1 is added
-                            sys.argv[1:] is just @ARGV
-
-
-}
-
-# returns a modified 'exp' list, by subtracting -1
-sub _nodes_minus_one {
-    my ($self, $nodes) = @_;
-    @nodes = @$nodes;   #make a copy
-    my $value;
-    if ($nodes[$i]->kind eq 'NUMBER') {
-        $value = $nodes[$i]->value;
-        shift @nodes;
-    } else  {
-        for (my $i = 1; $i < @nodes; $i++) {
-            if ($nodes[$i]->kind eq 'NUMBER' and 
-                $nodes[$i-1]->value ~~ ['+', '-']) {
-                #[+-]Number
-                $value = $nodes[$i-1]->value . $nodes[$i]->value;
-                splice @nodes, $i-1, 2;
-                last;
+        # all other types of slices and keys
+        $perl_sig  = $self._join_nodes($i, ' ');
+        $perl_sig .= '..' if $j;
+        $perl_sig .= $self._join_nodes($j, ' ') if $j;
+        if ($j and @$j == 0) {
+            # only really take the case of identifier or subscript
+            my $cl_str = $self->caller->to_string(TRUE);
+            if ($self->caller->kind eq 'IDENTIFIER') {
+                $cl_str =~ s/\$/\$#/;
+                $perl_sig .= $cl_str;
+            } else {
+                $perl_sig .= "\$#{$cl_str}";
             }
         }
     }
 
-    $value .= '-1';
-    $value = eval()
-    if (not $modified) {
-        push @nodes, new Node::Arithmetic('-');
-        push @nodes, new Node::Number(-1);
+    if ($python_sig eq ':') {
+        # no arguments given
+        $perl_sig = '';
     }
 
-    return [@nodes];
-
+    return $perl_sig;
 }
 
 
 sub infer_type {
     my ($self, $type_manager) = @_;
-    if ($self->is_slice) {
-        #figure out if slice of 1 , or 
-    }
     my $caller_type = $self->caller->infer_type($type_manager);
-
-    #TODO
-
-
+    my $key = $self->_get_key;
+    my $type = $caller_type->get_query($key);
+    $self->type($type);
     return $type;
+}
+
+# get the subscription key
+sub _get_key {
+    my ($self) = @_;
+    my $key = $self->_join_nodes($self->children->get_list(0), ' ');
+    $key = '0' unless $key;
+    return $key;
 }
 
 sub is_slice {
     my ($self) = @_;
-    return ($self->children->list_count > 1)
+    return ($self->children->list_count > 1);
 }
 
 sub imply_type {
     my ($self, $type_manager, $type) = @_;
-    if ($self->is_slice) {
-        return;
+    my $caller_type = $self->caller->type;
+    my $key = $self->_get_key;
+    if (!$self->is_slice) {
+        $self->type($type);
+        $caller_type->set_query($key, $type);
     }
-    $self->type($type);
-    $type_manager->set($self->value, $type);
 }
 
 #-----------------------------------------------------------------------
@@ -388,12 +393,17 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $scalar_cxt) = @_;
+    my ($self, $as_scalar) = @_;
     my $str = '$'.$self->value;
-    if (!$scalar_cxt) {
+    given ($self->type->kind) {
+        when ('HASH')   { $str = '%'.$self->value }
+        when ('ARRAY')  { $str = '@'.$self->value }
+        default         { $str = '$'.$self->value }
+    } 
+    if ($as_scalar) {
         given ($self->type->kind) {
-            when ('HASH')   { $str = '%'.$self->value }
-            when ('ARRAY')  { $str = '@'.$self->value }
+            when ('HASH')   { $str = "\\$str" }
+            when ('ARRAY')  { $str = "\\$str" }
         }        
     }
     return $str;

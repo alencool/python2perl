@@ -95,4 +95,11 @@ sub get_lists {
     return (@{$self->lists});
 }
 
+# removes last list if empty
+sub chomp {
+    my ($self) = @_;
+    my $list = $self->get_list(-1);
+    pop @{$self->lists} unless @$list;
+}
+
 1;

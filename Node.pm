@@ -299,6 +299,37 @@ sub _peel_multilist {
 }
 
 
+# returns a modified 'exp' list, by subtracting -1
+sub _nodes_minus_one {
+    my ($self, $nodes) = @_;
+    @nodes = @$nodes;   #make a copy
+    my $value;
+    if ($nodes[$i]->kind eq 'NUMBER') {
+        $value = $nodes[$i]->value;
+        shift @nodes;
+    } else  {
+        for (my $i = 1; $i < @nodes; $i++) {
+            if ($nodes[$i]->kind eq 'NUMBER' and 
+                $nodes[$i-1]->value ~~ ['+', '-']) {
+                #[+-]Number
+                $value = $nodes[$i-1]->value . $nodes[$i]->value;
+                splice @nodes, $i-1, 2;
+                last;
+            }
+        }
+    }
+    $value .= '-1';
+    $value = eval($value);
+    if ($value < 0) {
+        push @nodes, new Node::Arithmetic('-');
+        push @nodes, new Node::Number($value * -1);
+    } elsif ($value > 0) {
+        push @nodes, new Node::Arithmetic('+');
+        push @nodes, new Node::Number($value);
+    }
+    return [@nodes];
+}
+
 # returns prev,next stored types
 sub get_sibling_types {
     my ($self) = @_;
@@ -312,15 +343,6 @@ sub get_sibling_types {
 # COMPARISON
 # IN
 # LOGICAL
-
-
-# perl
-# @doubles = (1,2,3,4);
-
-# print @doubles;
-# for my $i (@a) {
-
-# }
 
 # urinary ~  
 # **

@@ -38,13 +38,13 @@ sub kind {
 }
 
 # from key or index given return type
-sub query {
+sub get_query {
     my ($self, $key) = @_;
     my $type = new Type('NUMBER');
     my $data = $self->data;
 
-    # set type from dictionary key
-    my $_dict = sub {
+    # set type from hash key
+    my $_hash = sub {
         if (%$data) {
             if ($key ~~ $data) {
                 $type = $data->{$key};
@@ -69,12 +69,24 @@ sub query {
     given ($self->kind) {
         when ('STRING') { $type = $self }
         when ('ARRAY')  { $_array->() }
-        when ('DICT')   { $_dict->() }
+        when ('HASH')   { $_hash->() }
     }
 
     return $type;
 }
 
+# set key or index given type
+sub set_query {
+    my ($self, $key, $type) = @_;
+    my $data = $self->data;
+
+    if ($self->kind eq 'ARRAY') {
+        $key = int(eval($key) || 0);
+        $data->[$key] = $type;
+    } elsif ($self->kind eq 'HASH'){
+        $data->{$key} = $type;
+    }
+}
 
 #-----------------------------------------------------------------------
 #  _____               __  __                             
