@@ -4,7 +4,7 @@
 #  structure of python code. It can be used to store information or 
 #  other nodes in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 20/09/14, edited 26/9/14
+#  Created by Alen Bou-Haidar on 20/09/14, edited 4/10/14
 #
 
 use strict;
@@ -46,11 +46,11 @@ sub new {
                  children    => new MultiList };
 
     my $object = bless $self, $class;
-    $self->_init($value);
     # subclass can define their kind/subkind easily 
     # by implementing these private methods
     $self->kind($self->_kind);
     $self->subkind($self->_subkind);
+    $self->_init($value);
     return $object;
 }
 
@@ -61,14 +61,17 @@ sub _init {
 
 # init node kind
 sub _kind {
-    return 'NODE';
+    my ($self) = @_;
+    $self =~ /::(.+)=HASH/;
+    return uc $1;
 }
 
 # init node subkind
 sub _subkind {
-    return '';
+    my ($self) = @_;
+    $self =~ /::(.+)=HASH/;
+    return uc $1;
 }
-
 # add child node, set its depth, parent and sibling properties
 sub add_child {
     my ($self, $node) = @_;
@@ -142,10 +145,10 @@ sub indent {
 
 # returns nodes joined together by a seperator
 sub join_nodes {
-    my ($self, $nodes, $node_sep) = @_;
+    my ($self, $nodes, $context) = @_;
     my ($string, @node_strings);
-    @node_strings = map {$_->to_string} @$nodes;
-    $string = join($node_sep, @node_strings);
+    @node_strings = map {$_->to_string($context)} @$nodes;
+    $string = join(' ', @node_strings);
     #adjust for unary operators
     $string =~ s/! /!/g;
     $string =~ s/ ~ / ~/g;
@@ -156,12 +159,12 @@ sub join_nodes {
 # returns nodes of multilist joined together by seperators
 # useful for when a node manages multiple multilists
 sub join_multilist {
-    my ($self, $multilist, @list_sep) = @_;
+    my ($self, $multilist, $context, @list_sep) = @_;
     my (@lists, @list_strings, $lastitem, $i);
-    $list_sep[0] = $list_sep[0] || ', ';
-    $list_sep[1] = $list_sep[1] || $list_sep[0];
+    $list_sep[0] ||= ', ';
+    $list_sep[1] ||= $list_sep[0];
     @lists = $multilist->get_lists;
-    @list_strings = map {$self->join_nodes($_, ' ')} @lists;
+    @list_strings = map {$self->join_nodes($_, $context)} @lists;
     $lastitem = pop @list_strings;
     @list_strings = map {$i = !$i; $_ . $list_sep[!$i]} @list_strings;
     return join('', (@list_strings, $lastitem));
@@ -169,8 +172,8 @@ sub join_multilist {
 
 # returns children joined together by seperators
 sub join_children {
-    my ($self, @list_sep) = @_;
-    return $self->join_multilist($self->children, @list_sep);
+    my ($self, $context, @list_sep) = @_;
+    return $self->join_multilist($self->children, $context, @list_sep);
 }
 
 
@@ -179,7 +182,7 @@ sub infer_type {
     my ($self, $type_manager) = @_;
     $type_manager = new Type::Manager unless defined $type_manager;
     my $multi = $self->children;
-    $self->type($self->infer_type_from_multilist($type_manager, $multi));
+    $self->type($self->infer_from_multilist($type_manager, $multi));
     return $self->type;
 }
 
@@ -238,7 +241,7 @@ sub translate_notin {
 
 # attempt to deduce its representive type from list of nodes
 # - order of importance, hash, array, string the default, number
-sub infer_type_from_list {
+sub infer_from_list {
     my ($self, $type_manager, @nodes) = @_;
     my $type = new Type('NUMBER');
     for my $node (@nodes) {
@@ -261,14 +264,14 @@ sub infer_type_from_list {
     return $type;
 }
 
-sub infer_type_from_multilist {
+sub infer_from_multilist {
     my ($self, $type_manager, $multi) = @_;
     my (@types, $type);
     my @lists = $multi->get_lists;
 
     for my $list (@lists){
         if (@$list) {
-            $type = infer_type_from_list($type_manager, @$list);
+            $type = $self->infer_from_list($type_manager, @$list);
             push @types, $type;
         }
     }
@@ -302,30 +305,40 @@ sub _peel_multilist {
 # returns a modified 'exp' list, by subtracting -1
 sub _nodes_minus_one {
     my ($self, $nodes) = @_;
-    @nodes = @$nodes;   #make a copy
+    my @nodes = @$nodes;   #make a copy
     my $value;
-    if ($nodes[$i]->kind eq 'NUMBER') {
-        $value = $nodes[$i]->value;
-        shift @nodes;
-    } else  {
-        for (my $i = 1; $i < @nodes; $i++) {
-            if ($nodes[$i]->kind eq 'NUMBER' and 
-                $nodes[$i-1]->value ~~ ['+', '-']) {
-                #[+-]Number
-                $value = $nodes[$i-1]->value . $nodes[$i]->value;
-                splice @nodes, $i-1, 2;
-                last;
+    
+    if (@nodes) {
+        if ($nodes[0]->kind eq 'NUMBER') {
+            $value = $nodes[0]->value;
+            shift @nodes;
+        } else  {
+            for (my $i = 1; $i < @nodes; $i++) {
+                if ($nodes[$i]->kind eq 'NUMBER' and 
+                    $nodes[$i-1]->value ~~ ['+', '-']) {
+                    #[+-]Number
+                    $value = $nodes[$i-1]->value . $nodes[$i]->value;
+                    splice @nodes, $i-1, 2;
+                    last;
+                }
             }
         }
-    }
-    $value .= '-1';
-    $value = eval($value);
-    if ($value < 0) {
-        push @nodes, new Node::Arithmetic('-');
-        push @nodes, new Node::Number($value * -1);
-    } elsif ($value > 0) {
-        push @nodes, new Node::Arithmetic('+');
-        push @nodes, new Node::Number($value);
+        $value .= '-1';
+        $value = eval($value);
+        if ($value < 0) {
+            if (@nodes) {
+                push @nodes, new Node::Arithmetic::('-');
+                push @nodes, new Node::Number::($value * -1);
+            } else {
+                push @nodes, new Node::Number::($value);
+            }
+
+        } elsif ($value > 0) {
+            push @nodes, new Node::Arithmetic::('+') if @nodes;
+            push @nodes, new Node::Number::($value);
+        } else {
+            push @nodes, new Node::Number::($value) unless @nodes;
+        }
     }
     return [@nodes];
 }

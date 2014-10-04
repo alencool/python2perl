@@ -94,7 +94,7 @@ sub parse {
     }
 
     # Some final modifications to the tree
-    # $root->infer_type;
+    $root->infer_type;
     # $root->translate_list_add;
     $root->translate_notin;
     return $root;

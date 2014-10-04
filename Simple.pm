@@ -3,7 +3,7 @@
 #  Defines is a set of classes that represent simple statments in 
 #  python for use in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 26/09/14, edited 26/9/14
+#  Created by Alen Bou-Haidar on 26/09/14, edited 4/10/14
 #
 
 use strict;
@@ -53,39 +53,29 @@ sub to_string {
 package Node::Invisible;
 use base 'Node::Simple';
 
-sub _kind {
-    return 'INVISIBLE';
-}
 sub to_string {
     my ($self) = @_;
     return $self->comment;
 }
 
-
 #-----------------------------------------------------------------------
 package Node::Break;
 use base 'Node::Simple';
-
 #-----------------------------------------------------------------------
 package Node::Continue;
 use base 'Node::Simple';
-
 #-----------------------------------------------------------------------
 package Node::Expression;
 use Constants;
 use base 'Node::Simple';
-Node::Expression->mk_accessors(qw(targets));
-
-sub _kind {
-    return 'EXPRESSION';
-}
-#expression nodes are passed the TypeManager. which it then modifies
+Node::Expression->mk_accessors(qw(targets assignment));
 
 # adds child the last open tuple, if none then creates it
 sub _init {
     my ($self) = @_;
     $self->SUPER::_init;
     $self->targets([]);
+    $self->assignment('');
 }
 
 sub infer_type {
@@ -94,35 +84,28 @@ sub infer_type {
     # get type from right most multilist
     $self->SUPER::infer_type($type_manager);
 
-    # get all target multilists
-    my @targets = @{$self->targets};
-    # filter out assigment nodes
-    @targets  = @targets[grep $_ % 2, 0..$#targets];
-    map {$self->infer_type_from_multilist($type_manager, $_)} @targets;
+    # infer and assign types for targets
+    $self->_assign_types($type_manager) if $self->assignment;
 
-    $self->_assign_types($type_manager) if @targets;
-    
     return $self->type;
 }
 
 sub _assign_types {
     my ($self, $type_manager) = @_;
     my (@types, @targets, $node, $type);
-    
+
+    @targets = @{$self->targets};
+
     # get types
-    if ($self->type->kind eq 'ARRAY') {
+    if ($self->type->kind eq 'ARRAY' and $targets[-1]->list_count > 1) {
         @types = @{$self->type->data};
     } else {
         @types = ($self->type->data);
     }
-
+    
     # assign types to each target
-    @targets = @{$self->targets};
-    if ($targets[1]->value eq '=') {
-        # filter out assigment nodes
-        @targets  = @targets[grep $_ % 2, 0..$#targets];
-        for $target (@targets) {
-            $target->chomp;
+    if ($self->assignment eq '=') {
+        for my $target (@targets) {
             if ($target->list_count == 1) { 
                 $node = $target->get_single;
                 $node->imply_type($type_manager, $self->type);
@@ -135,37 +118,98 @@ sub _assign_types {
             }
         }
     }
+    map {$self->infer_from_multilist($type_manager, $_)} @targets;
+
 }
 
 sub to_string {
     my ($self) = @_;
-    my (@strings, $string);
-    my $node_assigment = TRUE;
-    for my $target (@{$self->targets}) {
-        $node_assigment = !$node_assigment;
-        if ($node_assigment) {
-            #target is a Node::Assigment
-            push @strings, $target->to_string;
-        } else {
-            #target is a multilist
-            $string = $self->join_multilist($target);
-            $string = qq/($string)/ if ($target->list_count > 1);
-            push @strings, $string;
-        }
+    my @strings;    # list of components to make up the expression
+    my $string;     # final expression
+    my $uno_target; # contains the first left most target node
+    my $uno_value;  # contains single value node if only one
+    my $is_single;  # true if only a single value
+
+    my @targets = @{$self->targets};
+    for my $target (@targets) {
+        $string = $self->join_multilist($target, 'TARGET');
+        $string = qq/($string)/ if ($target->list_count > 1);
+        push @strings, $string; 
     }
-    $string = join(' ', @strings);
+    if (@targets) {
+        $uno_target = $targets[-1]->get_single;
+        $uno_value = $self->children->get_single;
+        $is_single = $self->children->is_single;
+        
+        if ($is_single and $targets[-1]->is_single and 
+            $uno_target->kind ne 'SUBSCRIPT') {
+            $string = $self->join_children('EXPAND');
+        } else {
+            $string = $self->join_children;
+        }
+        $string = qq/($string)/ if ($self->children->list_count > 1);
+        push @strings, $string;
+    }
+
+
+    given ($self->assignment) {
+        when ('')   {
+            $string = $self->join_children;
+        }
+        when ('=')  {
+            $string = join(' = ', @strings);
+        }
+        when ('*=') {
+            if ($uno_target->type->kind eq 'STRING') {
+                $string = join(' x= ', @strings);
+            } else {
+                $string = join(' *= ', @strings);
+            }
+        }
+        when ('+=') {
+            if ($uno_target->type->kind eq 'STRING') {
+                $string = join(' .= ', @strings);
+            } elsif  ($uno_target->type->kind eq 'ARRAY') {
+                $string = $self->join_multilist($targets[-1], 'EXPAND');
+                $string = "push $string, ";
+                $string .= $self->join_children('EXPAND');
+            } elsif ($is_single and $uno_value->value eq '1' ) {
+                $string = $strings[0]."++";
+            } else {
+                $string = join(' += ', @strings);
+            }
+        }
+        when ('-=') {
+            if ($is_single and $uno_value->value eq '1' ) {
+                $string = $strings[0]."--";
+            } else {
+                $string = join(' -= ', @strings);
+            }
+        }
+        default     {
+            $string = join(' '.$self->assignment.' ', @strings);
+        }
+
+    }
+
     $string = $self->indent.$string.';' if $string;
     $string .= $self->comment;
     
     return $string;
 }
 
+# return true if targets exist
+sub _has_targets {
+    my ($self) = @_;
+    return (@{$self->targets} > 0);
+
+}
+
 # output format suitable for a condiional statement
 sub to_string_conditional {
     my ($self) = @_;
     my ($multi, $str);
-    $multi = $self->targets->[0];
-    $str = $self->join_multilist($multi);
+    $str = $self->join_children;
     $str = qq/ ($str)/ if $str;
     return $str;
 }
@@ -174,15 +218,17 @@ sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
     if ($node->kind eq 'ASSIGNMENT') {
-        # transformed to assimgnet statement, extract targets
+        # transformed to assignment statement, extract targets
         $self->_peel_multilist;
-        push @{$self->targets}, ($self->children, $node);
+        $self->children->chomp;
+        push @{$self->targets}, $self->children;
         $self->children(new MultiList);
+        $self->assignment($node->value);
     } elsif ($node->kind eq 'COMA_SEPERATOR') {
         # new list for each target expression
         $self->children->new_list;
     } elsif ($node->kind ~~ ['STMT_SEPERATOR', 'COLN_SEPERATOR']){
-        # statement completion, extract to target list
+        # statement completion
         $self->_peel_multilist;
         $self->complete(TRUE);
     } else {
@@ -195,22 +241,13 @@ sub _on_event_add_child {
 package Node::Print;
 use base 'Node::Simple';
 
-
 sub to_string {
     my ($self) = @_;
     return $self->SUPER::to_string('print');
 }
 
-sub _kind {
-    return 'PRINT';
-}
-
 #-----------------------------------------------------------------------
 package Node::Return;
 use base 'Node::Simple';
-
-sub _kind {
-    return 'RETURN';
-}
 
 1;

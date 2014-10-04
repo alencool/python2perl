@@ -46,10 +46,10 @@ sub get_query {
     # set type from hash key
     my $_hash = sub {
         if (%$data) {
-            if ($key ~~ $data) {
+            if ($key ~~ %$data) {
                 $type = $data->{$key};
             } else {
-                my @keys = keys(%$a);
+                my @keys = keys(%$data);
                 $type = $data->{$keys[0]};
             }
         } 
@@ -98,8 +98,6 @@ sub set_query {
 #-----------------------------------------------------------------------
 
 package Type::Manager;
-use base 'Class::Accessor';
-Type::Manager->mk_accessors(qw(frames));
 
 # constructor
 sub new {
@@ -113,6 +111,7 @@ sub new {
 sub get {
     my ($self, $name) = @_;
     my $value = undef;
+
     for my $frame (@{$self->frames}) {
         if ($name ~~ $frame) {
             $value = $frame->{$name};
@@ -120,6 +119,11 @@ sub get {
         }
     }
     return $value;
+}
+
+sub frames {
+    my ($self) = @_;
+    return $self->{frames};
 }
 
 # stores type for name

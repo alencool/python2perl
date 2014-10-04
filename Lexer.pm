@@ -90,7 +90,6 @@ sub has_next {
 # returns next token, and removes from list
 sub next {
     my $self = shift;
-    # print $self->peak->kind, $self->peak->value, "\n";
     return shift @{$self->{nodes}}; 
 }
 
@@ -110,11 +109,11 @@ sub tokenize {
     # line iterator, used in line continuation
     my $get_line = sub {
         my $line = shift @lines;
-        chomp $line;            # remove new lines
+        chomp $line if defined $line;
         return $line;
-    }
+    };
 
-    while (my $line = $get_line->()) {
+    while (defined(my $line = $get_line->())) {
         my $str = $line;        # str will be consumed
         my @token_buffer = ();  # hold nodes incase of error
         my $node;               # current node

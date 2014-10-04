@@ -3,7 +3,7 @@
 #  Defines is a set of classes that represent elemental parts in 
 #  python for use in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 26/09/14, edited 26/9/14
+#  Created by Alen Bou-Haidar on 26/09/14, edited 4/10/14
 #
 
 use strict;
@@ -38,11 +38,6 @@ sub _init {
     $self->value('/') if ($value eq '//');
 }
 
-
-sub _kind {
-    return 'ARITHMETIC';
-}
-
 sub to_string {
     my ($self) = @_;
     my $str = $self->value;
@@ -63,18 +58,9 @@ sub _init {
     $self->value('/=') if ($value eq '//=');
 }
 
-sub _kind {
-    return 'ASSIGNMENT';
-}
-
 #-----------------------------------------------------------------------
 package Node::Bitwise;
 use base 'Node::Element';
-
-sub _kind {
-    return 'BITWISE';
-}
-
 #-----------------------------------------------------------------------
 package Node::Comparison;
 use base 'Node::Element';
@@ -110,11 +96,6 @@ sub _kind {
 #-----------------------------------------------------------------------
 package Node::Closer;
 use base 'Node::Element';
-
-sub _kind {
-    return 'CLOSER';
-}
-
 #-----------------------------------------------------------------------
 package Node::Encloser;
 use Constants;
@@ -142,7 +123,7 @@ sub infer_type {
     my ($self, $type_manager) = @_;
     my ($type, $multi);
     $multi = $self->children;
-    $type = $self->infer_type_from_multilist($type_manager, $multi);
+    $type = $self->infer_from_multilist($type_manager, $multi);
 
     return $type;
 
@@ -152,20 +133,13 @@ sub infer_type {
 package Node::Dict;
 use base 'Node::Encloser';
 
-sub _kind {
-    return 'DICT';
-}
-
 sub to_string {
-    my ($self, $as_scalar) = @_;
-    my $str = $self->join_children(' => ',', ');
-    if (not defined $as_scalar) {
-        $as_scalar = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
-    }
-    if ($as_scalar) {
-        $str = qq/{$str}/;
-    } else {
+    my ($self, $context) = @_;
+    my $str = $self->join_children(undef, ' => ', ', ');
+    if ($context ~~ 'EXPAND') {
         $str = qq/($str)/;
+    } else {
+        $str = qq/{$str}/;
     }
     return $str;
 }
@@ -182,11 +156,12 @@ sub infer_type {
         my $value = $iter->();
         last unless defined $value;
         if ($key->[0]->kind ~~ ['NUMBER', 'STRING']) {
-            $key = $key->[0]->value || '_';
-            $type = $self->infer_type_from_list($type_manager, @$value);
+            $key = $key->[0]->to_string || '_';
+            $type = $self->infer_from_list($type_manager, @$value);
             $dict->{$key} = $type;
         }
     }
+
     $type = new Type($dict);
     return $type;
 }
@@ -196,20 +171,13 @@ sub infer_type {
 package Node::List;
 use base 'Node::Encloser';
 
-sub _kind {
-    return 'LIST';
-}
-
 sub to_string {
-    my ($self, $as_scalar) = @_;
+    my ($self, $context) = @_;
     my $str = $self->join_children;
-    if (not defined $as_scalar) {
-        $as_scalar = ($self->parent->kind ~~ ['LIST','DICT','TUPLE']);
-    }
-    if ($as_scalar) {
-        $str = qq/[$str]/;
-    } else {
+    if ($context ~~ 'EXPAND') {
         $str = qq/($str)/;
+    } else {
+        $str = qq/[$str]/;
     }
     return $str;
 }
@@ -219,11 +187,6 @@ package Node::Flat;
 use base 'Node::List';
 use Constants;
 
-sub _kind {
-    # special flatten list type of container
-    return 'FLAT';
-}
-
 sub _on_event_add_child {
     my ($self, $node) = @_;
     if (!$self->is_leaf) {
@@ -232,17 +195,24 @@ sub _on_event_add_child {
     return TRUE;
 }
 
+sub to_string {
+    my ($self, $context) = @_;
+    my $str = $self->join_children('EXPAND');
+    if ($context ~~ 'EXPAND') {
+        $str = qq/($str)/;
+    } else {
+        $str = qq/[$str]/;
+    }
+    return $str;
+}
+
 #-----------------------------------------------------------------------
 package Node::Tuple;
 use base 'Node::Encloser';
 
-sub _kind {
-    return 'TUPLE';
-}
-
 sub to_string {
     my ($self) = @_;
-    return sprintf("(%s)", $self->join_children());
+    return sprintf("(%s)", $self->join_children);
 }
 
 #-----------------------------------------------------------------------
@@ -257,35 +227,36 @@ sub set_caller {
     $caller->parent($self);
 }
 
-sub _kind {
-    return 'SUBSCRIPT';
-}
-
 sub to_string {
-    my ($self, $as_scalar) = @_;
+    my ($self, $context) = @_;
+
     my $cl_kind   = $self->caller->kind;
     my $cl_name  = '$'.$self->caller->value;
-    my $cl_scalar = $self->caller->to_string(TRUE);
-    my $cl_nonsca = $self->caller->to_string(FALSE);
+    
+    my $cl_scalar = $self->caller->to_string;
+    my $cl_nonsca = $self->caller->to_string('EXPAND');
+    
     my $signature = $self->_get_signature;
     my $str;
-    if (not $signature) {
-        $str = $as_scalar ? $cl_scalar : $cl_nonsca;
-    } elsif ($self->is_slice) 
-        $str = "$cl_nonsca[$signature]";
+
+    if ($signature ~~ "") {
+        $str = $self->caller->to_string($context);
+    } elsif ($self->is_slice) {
+        $str = $cl_nonsca."[$signature]";
         $str = "\@{$cl_scalar}[$signature]" if $cl_kind eq 'SUBSCRIPT';
-        $str = "[$str]" if ($as_scalar);
+        $str = "[$str]" unless ($context ~~ 'EXPAND');
     } else { 
-        if ($caller->type->kind eq 'HASH') {
-            $str = "$cl_scalar{$signature}";
-            $str = "$cl_scalar->{$signature}" if $cl_kind eq 'DICT';
-            $str = "$cl_name{$signature}" if $cl_kind eq 'IDENTIFIER';
+        if ($self->caller->type->kind eq 'HASH') {
+            $str = $cl_scalar."{$signature}";
+            $str = $cl_scalar."->{$signature}" if $cl_kind eq 'DICT';
+            $str = $cl_name."{$signature}" if $cl_kind eq 'IDENTIFIER';
         } else {
-            $str = "$cl_scalar[$signature]";
-            $str = "$cl_nonsca[$signature]" if $cl_kind eq 'LIST';
-            $str = "$cl_name[$signature]" if $cl_kind eq 'IDENTIFIER';
+
+            $str = $cl_scalar."[$signature]";
+            $str = $cl_nonsca."[$signature]" if $cl_kind eq 'LIST';
+            $str = $cl_name."[$signature]" if $cl_kind eq 'IDENTIFIER';
         }
-        if (not $as_scalar) {
+        if ($context ~~ 'EXPAND') {
             given ($self->type->kind) {
                 when ('ARRAY')  { $str = "\@{$str}" }
                 when ('HASH')   { $str = "%{$str}" }
@@ -293,13 +264,12 @@ sub to_string {
         }
     }
 
-
     return $str;
 }
 
 sub _get_signature {
     my ($self) = @_;
-    my $python_sig = $self->join_children(':');
+    my $python_sig = $self->join_children(undef, ':');
     my $perl_sig;
 
     # [i:j] with index k such that i <= k < j. 
@@ -311,8 +281,7 @@ sub _get_signature {
     push @$i, new Node::Number(0) unless @$i > 0;
     $j = $self->_nodes_minus_one($j) if $j;
 
-    if ($self->caller->kind eq 'IDENTIFIER' and  
-        $self->caller->value eq 'ARGV') {
+    if ($self->caller->subkind eq 'ARGV') {
         # consider the case of ARGV
         if ($python_sig eq '1:'){
             # special case where we can drop the slice
@@ -321,21 +290,21 @@ sub _get_signature {
             # perls argv missing $0, so -1 to i and j
             $i = $self->_nodes_minus_one($i);
             $j = $self->_nodes_minus_one($j) if $j;
-            $perl_sig  = $self._join_nodes($i, ' ');
+            $perl_sig  = $self->join_nodes($i);
             $perl_sig .= '..' if $j;
-            $perl_sig .= $self._join_nodes($j, ' ') if $j;
+            $perl_sig .= $self->join_nodes($j) if $j;
             $perl_sig .= "\$#ARGV" if $j and @$j == 0;
         }
     } else {
         # all other types of slices and keys
-        $perl_sig  = $self._join_nodes($i, ' ');
+        $perl_sig  = $self->join_nodes($i);
         $perl_sig .= '..' if $j;
-        $perl_sig .= $self._join_nodes($j, ' ') if $j;
+        $perl_sig .= $self->join_nodes($j) if $j;
         if ($j and @$j == 0) {
             # only really take the case of identifier or subscript
-            my $cl_str = $self->caller->to_string(TRUE);
+            my $cl_str = $self->caller->to_string;
             if ($self->caller->kind eq 'IDENTIFIER') {
-                $cl_str =~ s/\$/\$#/;
+                $cl_str =~ s/\\@/\$#/;
                 $perl_sig .= $cl_str;
             } else {
                 $perl_sig .= "\$#{$cl_str}";
@@ -354,9 +323,14 @@ sub _get_signature {
 
 sub infer_type {
     my ($self, $type_manager) = @_;
+    my ($type, $key);
     my $caller_type = $self->caller->infer_type($type_manager);
-    my $key = $self->_get_key;
-    my $type = $caller_type->get_query($key);
+    if ($self->is_slice) {
+        $type = $caller_type;
+    } else {
+        $key = $self->_get_key;
+        $type = $caller_type->get_query($key);
+    }
     $self->type($type);
     return $type;
 }
@@ -364,7 +338,7 @@ sub infer_type {
 # get the subscription key
 sub _get_key {
     my ($self) = @_;
-    my $key = $self->_join_nodes($self->children->get_list(0), ' ');
+    my $key = $self->join_nodes($self->children->get_list(0));
     $key = '0' unless $key;
     return $key;
 }
@@ -393,14 +367,15 @@ sub _kind {
 }
 
 sub to_string {
-    my ($self, $as_scalar) = @_;
+    my ($self, $context) = @_;
     my $str = '$'.$self->value;
+
     given ($self->type->kind) {
         when ('HASH')   { $str = '%'.$self->value }
         when ('ARRAY')  { $str = '@'.$self->value }
         default         { $str = '$'.$self->value }
     } 
-    if ($as_scalar) {
+    if (!$context) {
         given ($self->type->kind) {
             when ('HASH')   { $str = "\\$str" }
             when ('ARRAY')  { $str = "\\$str" }
@@ -570,50 +545,21 @@ use base 'Node::MethodCall';
 #-----------------------------------------------------------------------
 package Node::In;
 use base 'Node::Element';
-
-sub _kind {
-    return 'IN';
-}
-
 #-----------------------------------------------------------------------
 package Node::Not;
 use base 'Node::Element';
-
-sub _kind {
-    return 'NOT';
-}
-
 #-----------------------------------------------------------------------
 package Node::And;
 use base 'Node::Element';
-
-sub _kind {
-    return 'AND';
-}
-
 #-----------------------------------------------------------------------
 package Node::Or;
 use base 'Node::Element';
-
-sub _kind {
-    return 'OR';
-}
-
 #-----------------------------------------------------------------------
 package Node::Number;
 use base 'Node::Element';
-
-sub _kind {
-    return 'NUMBER';
-}
-
 #-----------------------------------------------------------------------
 package Node::String;
 use base 'Node';
-
-sub _kind {
-    return 'STRING';
-}
 
 sub to_string {
     my ($self) = @_;
@@ -682,10 +628,6 @@ sub infer_type {
     return $self->type;
 }
 
-sub _kind {
-    return 'SPRINTF';
-}
-
 # where possible interpolate arguments
 # if all arguments interpolated then convert to string node
 sub _interpolate_args {
@@ -751,42 +693,17 @@ sub _kind {
 #-----------------------------------------------------------------------
 package Node::Indent;
 use base 'Node';
-
-sub _kind {
-    return 'INDENT';
-}
-
 #-----------------------------------------------------------------------
 package Node::Whitespace;
 use base 'Node';
-
-sub _kind {
-    return 'WHITESPACE';
-}
-
 #-----------------------------------------------------------------------
 package Node::Lncontinue;
 use base 'Node';
-
-sub _kind {
-    return 'LNCONTINUE';
-}
-
 #-----------------------------------------------------------------------
 package Node::Comment;
 use base 'Node';
-
-sub _kind {
-    return 'COMMENT';
-}
-
 #-----------------------------------------------------------------------
-# Indicates an unrecognised token
 package Node::Error;
 use base 'Node';
-
-sub _kind {
-    return 'ERROR';
-}
 
 1;
