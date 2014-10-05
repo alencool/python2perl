@@ -37,8 +37,8 @@ sub _on_event_add_child {
         # since they on accept statments 
         $self->comment($node->comment);
     } elsif ($node->kind eq 'EXPRESSION' and 
-        $node->is_leaf              and
-        $self->children->is_single) {
+             $node->is_leaf              and
+             $self->children->is_single) {
             # first item is conditional
             # dont want one statement to be empty
             $add_child = FALSE;
@@ -46,47 +46,58 @@ sub _on_event_add_child {
     return $add_child;
 }
 
-
-
 sub to_string {
-    my ($self, $name) = @_;
-    my $list = $self->children->get_list(0);
-    my @strings;
-    my $exp = $list->[0]->to_string_conditional;
-    my $indent = $self->indent;
-    @strings = map {$_->to_string} @$list;
-    my $header = sprintf("$indent%s%s {%s", $name, $exp, $self->comment);
-    splice @strings, 0,1, $header;
-    push @strings, "$indent}";
+    my ($self) = @_;
+    my (@strings, $str);    
+    push @strings, $self->_header(lc($self->kind));
+    push @strings, $self->_body;
+    push @strings, $str if $str = $self->_endbody;
     return join("\n", @strings);
+}
+
+
+sub _header {
+    my ($self, $name) = @_;
+    my $ exp = $self->children->get_single->to_string_conditional;
+    return $self->indent.$name.$exp.' {'.$self->comment;
+}
+
+sub _body {
+    my ($self) = @_;
+    my $list = $self->children->get_list(0);
+    my @strings = map {$_->to_string} @$list;
+    shift @strings;
+    return join("\n", @strings);
+}
+
+sub _endbody {
+    my ($self) = @_;
+    return $self->indent.'}';
 }
 
 #-----------------------------------------------------------------------
 package Node::If;
 use base 'Node::Compound';
 
-sub to_string {
+sub _endbody {
     my ($self) = @_;
-    return $self->SUPER::to_string('if');
+    my $has_end = !($self->next and $self->next->kind ~~ ['ELSE', 'ELIF']);
+    return  ($has_end? $self->indent.'}' : '');
 }
 
 #-----------------------------------------------------------------------
-package Node::Elif;
-use base 'Node::Compound';
+package Node::Elsif;
+use base 'Node::If';
 
-sub to_string {
-    my ($self) = @_;
-    return $self->SUPER::to_string('elsif');
+sub _header {
+    my ($self, $name) = @_;
+    my $exp = $self->children->get_list(0)->to_string_conditional;
+    return $self->indent.'}'.$name.$exp.' {'.$self->comment;
 }
 
 #-----------------------------------------------------------------------
 package Node::Else;
-use base 'Node::Compound';
-
-sub to_string {
-    my ($self) = @_;
-    return $self->SUPER::to_string('else');
-}
+use base 'Node::Elsif';
 
 #-----------------------------------------------------------------------
 package Node::For;
@@ -101,13 +112,13 @@ sub to_string {
 package Node::While;
 use base 'Node::Compound';
 
-sub to_string {
-    my ($self) = @_;
-    return $self->SUPER::to_string('while');
-}
+# sub to_string {
+#     my ($self) = @_;
+#     return $self->SUPER::to_string('while');
+# }
 
 #-----------------------------------------------------------------------
-package Node::Def;
+package Node::Sub;
 use base 'Node::Compound';
 
 sub to_string {

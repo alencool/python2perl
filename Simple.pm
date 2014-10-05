@@ -40,9 +40,9 @@ sub _on_event_add_child {
 }
 
 sub to_string {
-    my ($self, $name) = @_;
+    my ($self) = @_;
     my $args = ';';
-    $name = $self->value unless defined $name;
+    my $name = lc($self->kind);
     if (not $self->is_leaf){
         $args = sprintf " %s;", $self->join_children;
     } 
@@ -58,12 +58,6 @@ sub to_string {
     return $self->comment;
 }
 
-#-----------------------------------------------------------------------
-package Node::Break;
-use base 'Node::Simple';
-#-----------------------------------------------------------------------
-package Node::Continue;
-use base 'Node::Simple';
 #-----------------------------------------------------------------------
 package Node::Expression;
 use Constants;
@@ -139,8 +133,7 @@ sub to_string {
     if (@targets) {
         $uno_target = $targets[-1]->get_single;
         $uno_value = $self->children->get_single;
-        $is_single = $self->children->is_single;
-        
+        $is_single = $self->children->is_empty;
         if ($is_single and $targets[-1]->is_single and 
             $uno_target->kind ne 'SUBSCRIPT') {
             $string = $self->join_children('EXPAND');
@@ -244,6 +237,7 @@ use Constants;
 
 sub to_string {
     my ($self) = @_;
+    $self->_peel_multilist;
     my @args;
     my @strings;
     my $new_line = TRUE;
@@ -290,13 +284,21 @@ sub to_string {
     push @strings, '';
     while (@args) {
         my $node = shift @args;
-        if ($node->kind eq 'STRING') {
+        if ($node->subkind eq 'PLAIN') {
             if (!$strings[-1]) {
                 $strings[-1] .= $self->indent."print(";
                 $strings[-1] .= $node->to_string ;
             } else {
                 $strings[-1] .= ", ";
                 $strings[-1] .= $node->to_string ;
+            }
+        } elsif ($node->kind eq 'STRING') {
+            if (!$strings[-1]) {
+                $strings[-1] .= $self->indent."print(";
+                $strings[-1] .= $node->value ;
+            } else {
+                $strings[-1] .= ", ";
+                $strings[-1] .= $node->value ;
             }
         } elsif ($node->kind eq 'SPRINTF') {
             while (@args and $args[0]->subkind eq 'PLAIN') {
@@ -336,6 +338,13 @@ sub to_string {
 
 #-----------------------------------------------------------------------
 package Node::Return;
+use base 'Node::Simple';
+
+#-----------------------------------------------------------------------
+package Node::Last;
+use base 'Node::Simple';
+#-----------------------------------------------------------------------
+package Node::Next;
 use base 'Node::Simple';
 
 1;

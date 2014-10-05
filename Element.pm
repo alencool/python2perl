@@ -23,7 +23,9 @@ use Constants;
 use base 'Node';
 
 sub infer_type {
-    my ($self) = @_;
+    my ($self, $type_manager) = @_;
+    my $multi = $self->children;
+    $self->infer_from_multilist($type_manager, $multi);
     $self->type(new Type('NUMBER'));
     return $self->type;
 }
@@ -423,6 +425,11 @@ package Node::Call;
 use Constants;
 use base 'Node::Element';
 
+sub _init {
+    my ($self) = @_;
+    $self->complete(FALSE);
+}
+
 sub _kind {
     return 'FUNCTION_CALL';
 }
@@ -434,7 +441,7 @@ sub _on_event_add_child {
     if ($node->kind eq 'COMA_SEPERATOR') {
         $self->children->new_list; 
     } elsif ($node->kind eq 'CLOSER') {
-        $self->complete = TRUE;
+        $self->complete(TRUE);
     } else {
         $add_child = TRUE;
     }
@@ -442,31 +449,43 @@ sub _on_event_add_child {
     return $add_child;
 }
 
-# sub to_string {
-#     my ($self, $name) = @_;
-#     $name = $self->value unless $name;
-
-#     my $list = $self->children->get_list(0);
-#     my @strings;
-#     my $expr = shift @$list;
-#     print $expr;
-#     my $conditional = $expr->join_children;
-#     my $indent = $self->indent;
-#     push @strings, sprintf("$indent%s%s {", $name, $conditional);
-#     for my $child (@$list) {
-#         push @strings, $child->to_string;
-#     }
-#     push @strings, "$indent}";
-#     return join("\n", @strings);
-# }
-
 #-----------------------------------------------------------------------
 package Node::CallInt;
 use base 'Node::Call';
 
+sub to_string {
+    my ($self) = @_;
+    my $args = $self->join_children;
+
+    return qq/int($args)/;
+}
+
 #-----------------------------------------------------------------------
 package Node::CallLen;
 use base 'Node::Call';
+
+sub to_string {
+    my ($self) = @_;
+    $self->_peel_multilist;
+    my $node = $self->children->get_single;
+    my $str = $node->to_string('EXPAND');
+    my $type_kind = $node->type->kind;
+    my $kind = $node->kind;
+    if ($type_kind eq 'STRING') {
+        $str = qq/length($str)/;
+    } elsif ($kind eq 'IDENTIFIER') {
+        $str = qq/scalar($str)/;
+    } elsif ($kind eq 'SUBSCRIPT') {
+        $str = qq/scalar($str)/;
+    } elsif ($kind eq 'LIST') {
+        $str = $node->to_string;
+        $str = qq/scalar(\@{$str})/;
+    } else {
+        $str = qq/scalar(\@{[$str]})/;
+    }
+    return $str;
+}
+
 
 #-----------------------------------------------------------------------
 package Node::CallOpen;

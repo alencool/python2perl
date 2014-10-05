@@ -63,11 +63,14 @@ my $re_comment     = qr/^\s*#.*/;
 # matches any whitespace characters
 my $re_whitespace  = qr/^\s+/;
 
-# matches any identifier; does not match a call 
-my $re_identifier  = qr/^[a-z_]\w*(\s*\.\s*(?!\w+\s*\()[a-z_]\w*)*/i;
+# matches a potential keyword
+my $re_keyword  = qr/^(?![a-z_]\w*\s*\.)[a-z_]\w*/i;
 
 # matches method and function calls
-my $re_call        = qr/^\.\s*[a-z_]\w*\s*\(/i;
+my $re_call        = qr/^\.?\s*[a-z_]\w*\s*\(/i;
+
+# matches any identifier; does not match a call 
+my $re_identifier  = qr/^[a-z_]\w*(\s*\.\s*(?!\w+\s*\()[a-z_]\w*)*/i;
 
 # matches explicit line continuation
 my $re_lncontinue  = qr/^(r?["'].*)?\\$/i;
@@ -137,7 +140,7 @@ sub tokenize {
         }
 
         # consume $str and create node tokens.
-        while($str) {
+        while(length($str)) {
             $node = $self->_extract_node(\$str, $prev_kind, $brace_stk);
             if ($node->kind eq 'WHITESPACE') {
                 # ignore any whitespace
@@ -213,7 +216,7 @@ sub _extract_node {
     };
 
     given ($$str) {
-        when (/$re_float/)      { $process_number->($re_float)  }
+        when (/$re_float/)      { $process_number->($re_float) }
         
         when (/$re_hex/)        { $process_number->($re_hex) }
         
@@ -254,12 +257,16 @@ sub _extract_node {
                                                 $prev_kind, $brace_stk);
                                   $$str =~ s/$re_encloser// }
 
-        when (/$re_identifier/) { $node = $self->_get_identifier($&);
-                                  $$str =~ s/$re_identifier// }
+        when (/$re_keyword/)    { $node = $self->_get_keyword($&);
+                                  continue unless $node;
+                                  $$str =~ s/$re_keyword// }
 
         when (/$re_call/)       { $node = $self->_get_call($&);
                                   $$str =~ s/$re_call//;
                                   $brace_stk->[0]++ }
+
+        when (/$re_identifier/) { $node = $self->_get_identifier($&);
+                                  $$str =~ s/$re_identifier// }
 
         when (/$re_comment/)    { $node = new Node::Comment($$str);
                                   $$str =~ s/$re_comment// }
@@ -275,21 +282,21 @@ sub _extract_node {
     return $node;
 }
 
-# Create correct node based on identifier
-sub _get_identifier {
+# Create correct node based on keyword
+sub _get_keyword {
     my ($self, $word) = @_;
     my $node;
     $word =~ s/\s//g;
     given ($word) {
         when ('if')         { $node = new Node::If }
-        when ('elif')       { $node = new Node::Elif }
+        when ('elif')       { $node = new Node::Elsif }
         when ('else')       { $node = new Node::Else }
         when ('for')        { $node = new Node::For }
         when ('while')      { $node = new Node::While }
-        when ('def')        { $node = new Node::Def }
-        when ('return')     { $node = new Node::Return('return') }
-        when ('break')      { $node = new Node::Break('last') }
-        when ('continue')   { $node = new Node::Continue('next') }
+        when ('def')        { $node = new Node::Sub }
+        when ('return')     { $node = new Node::Return }
+        when ('break')      { $node = new Node::Last }
+        when ('continue')   { $node = new Node::Next }
         when ('print')      { $node = new Node::Print }
         when ('not')        { $node = new Node::Not('!') }
         when ('and')        { $node = new Node::And('&&') }
@@ -298,6 +305,19 @@ sub _get_identifier {
         when ('False')      { $node = new Node::Number('0') }
         when ('in')         { $node = new Node::In('~~') }
         when ('import')     { $node = new Node::Invisible }
+        when ([KW_ERROR])   { $node = new Node::Error }
+        default             { $node = undef }
+    }
+
+    return $node;
+}
+
+# Create correct node based on identifier
+sub _get_identifier {
+    my ($self, $word) = @_;
+    my $node;
+    $word =~ s/\s//g;
+    given ($word) {
         when ('sys.stdout') { $node = new Node::Stdout }
         when ('sys.stdin')  { $node = new Node::Stdin }
         when ('sys.argv')   { $node = new Node::Argv('ARGV') }
