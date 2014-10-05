@@ -320,8 +320,8 @@ sub _get_identifier {
     given ($word) {
         when ('sys.stdout') { $node = new Node::Stdout }
         when ('sys.stdin')  { $node = new Node::Stdin }
+        when ('sys.stderr') { $node = new Node::Stderr }
         when ('sys.argv')   { $node = new Node::Argv('ARGV') }
-        when ([KW_ERROR])   { $node = new Node::Error }
         default             { $node = new Node::Identifier($word) }
     }
 
@@ -353,7 +353,7 @@ sub _get_call {
         when ('.sub')       { $node = new Node::CallSub }
         default             { $node = new Node::Call($call) }
     }
-
+    
     return $node;
 }
 

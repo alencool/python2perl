@@ -302,10 +302,9 @@ sub _peel_multilist {
     $self->children($children);
 }
 
-
-# returns a modified 'exp' list, by subtracting -1
-sub _nodes_minus_one {
-    my ($self, $nodes) = @_;
+# returns a modified 'exp' list, by modulating by amount
+sub _nodes_modulate {
+    my ($self, $nodes, $amount) = @_;
     my @nodes = @$nodes;   #make a copy
     my $value;
     
@@ -324,7 +323,7 @@ sub _nodes_minus_one {
                 }
             }
         }
-        $value .= '-1';
+        $value .= $amount;
         $value = eval($value);
         if ($value < 0) {
             if (@nodes) {
@@ -342,6 +341,19 @@ sub _nodes_minus_one {
         }
     }
     return [@nodes];
+}
+
+
+# returns a modified 'exp' list, by subtracting 1
+sub _nodes_minus_one {
+    my ($self, $nodes) = @_;
+    return $self->_nodes_modulate($nodes, '-1');
+}
+
+# returns a modified 'exp' list, by adding 1
+sub _nodes_plus_one {
+    my ($self, $nodes) = @_;
+    return $self->_nodes_modulate($nodes, '+1');
 }
 
 # returns prev,next stored types

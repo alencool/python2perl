@@ -407,6 +407,10 @@ package Node::Stdin;
 use base 'Node::Identifier';
 
 #-----------------------------------------------------------------------
+package Node::Stderr;
+use base 'Node::Identifier';
+
+#-----------------------------------------------------------------------
 package Node::Argv;
 use base 'Node::Identifier';
 
@@ -519,6 +523,13 @@ sub to_string {
     return $str;
 }
 
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->type(new Type([1..10]));
+    return $self->type;
+}
+
 #-----------------------------------------------------------------------
 package Node::MethodCall;
 use base 'Node::Call';
@@ -538,13 +549,57 @@ sub set_caller {
 package Node::CallWrite;
 use base 'Node::MethodCall';
 
+# caller is fileobj
+# exactly one argument string type
+sub to_string {
+    my ($self) = @_;
+    my $str;
+    my $cl_value = uc($self->caller->value);
+    my $cl_subkind = $self->caller->subkind;
+    my $arg = $self->children->get_single->to_string;
+    given ($cl_subkind) {
+        when ('IDENTIFIER') { $str = "print($cl_value, $arg)" }
+        when ('STDERR')     { $str = "print($cl_subkind, $arg)" }
+        default             { $str = "print($arg)" }
+    }
+    return $str;
+}
+
 #-----------------------------------------------------------------------
 package Node::CallReadline;
 use base 'Node::MethodCall';
 
+sub to_string {
+    my ($self) = @_;
+    my $str;
+    my $cl_value = uc($self->caller->value);
+    my $cl_subkind = $self->caller->subkind;
+    given ($cl_subkind) {
+        when ('IDENTIFIER') { $str = "<$cl_value>" }
+        default             { $str = "<STDIN>" }
+    }
+    return $str;
+}
+
+# returns a type STRING
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->type(new Type('STRING'));
+    return $self->type;
+}
+
 #-----------------------------------------------------------------------
 package Node::CallReadlines;
-use base 'Node::MethodCall';
+use base 'Node::CallReadline';
+
+# returns a type ARRAY of STRING's
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->type(new Type([new Type('STRING')]));
+    return $self->type;
+}
 
 #-----------------------------------------------------------------------
 package Node::CallFileinput;
@@ -566,9 +621,56 @@ use base 'Node::MethodCall';
 package Node::CallSplit;
 use base 'Node::MethodCall';
 
+
+# STRING.split(DELIMITER [, MAX]) => split(DELIMITER, STRING [, MAX+1])
+# DELIMITER default ' '
+sub to_string {
+    my ($self) = @_;
+    my $str;
+    my $string_arg = $self->caller->to_string;
+    my $deli = $self->children->get_list(0);
+    my $max = $self->children->get_list(1);
+    $deli = (@$deli ? $self->join_nodes($deli) : ' ');
+    $max = ($max ? $self->join_nodes($self->_nodes_plus_one($max)) : undef);
+
+    if (defined $max) {
+         $str = "split($deli, $string_arg, $max)";
+    } else {
+         $str = "split($deli, $string_arg)";
+    }
+
+    return $str;
+}
+
+# returns a type ARRAY of STRING's
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->type(new Type([new Type('STRING')]));
+    return $self->type;
+}
+
+
 #-----------------------------------------------------------------------
 package Node::CallJoin;
 use base 'Node::MethodCall';
+
+# DELIMITER.join(ARRAY) => join(STRING, ARRAY)
+sub to_string {
+    my ($self) = @_;
+    my $deli = $self->caller->to_string;
+    my $arg = $self->children->get_single->to_string('EXPAND');
+    return "join($deli, $arg)";
+}
+
+
+# returns a type STRING
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->type(new Type('STRING'));
+    return $self->type;
+}
 
 #-----------------------------------------------------------------------
 package Node::CallMatch;
