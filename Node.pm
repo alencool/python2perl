@@ -4,7 +4,7 @@
 #  structure of python code. It can be used to store information or 
 #  other nodes in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 20/09/14, edited 4/10/14
+#  Created by Alen Bou-Haidar on 20/09/14, edited 5/10/14
 #
 
 use strict;
@@ -351,28 +351,5 @@ sub get_sibling_types {
     return ($prev, $next)
 }
 
-# BITWISE
-# ARITHMETIC
-# COMPARISON
-# IN
-# LOGICAL
-
-# urinary ~  
-# **
-# * / 
-
-
-# % x   // to /
-# + -  . (concatinate
-# << >>
-# &
-# ^
-# |
-# < <= > >=
-# !=  ==  eq ne cmp
-# in    ~~   not in   !(  ~~  )
-# not   !
-# and   &&
-# or    ||
 
 1;

@@ -3,7 +3,7 @@
 #  Defines is a set of classes that represent elemental parts in 
 #  python for use in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 26/09/14, edited 4/10/14
+#  Created by Alen Bou-Haidar on 26/09/14, edited 5/10/14
 #
 
 use strict;
@@ -653,8 +653,13 @@ sub _interpolate_args {
             (@$arg == 1) &&                         # single node
             ($kind = $arg->[0]->kind) &&            # get node kind
             ($kind ~~ $interpolatable) &&           # correct type
-            ($part ~~ /^%[sd]/)) {                  # simple fmt
-            $new_fmtstr .= $arg->[0]->to_string;
+            ($part ~~ /^%s/)) {                     # simple fmt
+            if ($kind ~~ 'STRING') {
+                $new_fmtstr .= $arg->[0]->value;
+            } else {
+                $new_fmtstr .= $arg->[0]->to_string('EXPAND');
+            }
+
         } else {
             if ($arg) {
                 $new_args->new_list unless $new_args->is_empty;

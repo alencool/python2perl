@@ -3,7 +3,7 @@
 #  Defines a Parser class, for the creation of a abstract syntax tree 
 #  like structure from a sequence of node tokens.
 #
-#  Created by Alen Bou-Haidar on 19/09/14, edited 26/9/14
+#  Created by Alen Bou-Haidar on 19/09/14, edited 5/10/14
 #
 
 package Parser;
@@ -95,6 +95,7 @@ sub parse {
 
     # Some final modifications to the tree
     $root->infer_type;
+    $root->translate_sprintf;
     # $root->translate_list_add;
     $root->translate_notin;
     return $root;

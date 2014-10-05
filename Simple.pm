@@ -3,7 +3,7 @@
 #  Defines is a set of classes that represent simple statments in 
 #  python for use in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 26/09/14, edited 4/10/14
+#  Created by Alen Bou-Haidar on 26/09/14, edited 5/10/14
 #
 
 use strict;
@@ -240,10 +240,98 @@ sub _on_event_add_child {
 #-----------------------------------------------------------------------
 package Node::Print;
 use base 'Node::Simple';
+use Constants;
 
 sub to_string {
     my ($self) = @_;
-    return $self->SUPER::to_string('print');
+    my @args;
+    my @strings;
+    my $new_line = TRUE;
+    my $str_buffer = '';
+    my @expressions = $self->children->get_lists;
+    my $interpolatable = ['NUMBER', 'STRING', 'SUBSCRIPT', 'IDENTIFIER'];
+
+
+    my $push_buffer = sub {
+        if ($str_buffer) {
+            push @args, new Node::String::($str_buffer);
+            $args[-1]->subkind('PLAIN');
+            $str_buffer = '';
+        }
+    };
+
+    # interpolate arguments
+    for my $expr (@expressions) {
+        my $is_single = (@$expr == 1);
+        my $is_empty = (@$expr == 0);
+
+        if ($is_single and $expr->[0]->kind ~~ $interpolatable) {
+            $str_buffer .= ' ' if @args || $str_buffer;
+            if ($expr->[0]->kind ~~ 'STRING') {
+                $str_buffer .= $expr->[0]->value;
+            } else {
+                $str_buffer .= $expr->[0]->to_string('EXPAND');
+            }
+        } elsif ($is_single and $expr->[0]->kind ~~ 'SPRINTF') {
+            $push_buffer->();
+            push @args, $expr->[0];
+        } elsif ($is_empty) {
+            $str_buffer .= ' ';
+            $new_line = FALSE;
+        } else {
+            $push_buffer->();
+            push @args, new Node::String::($self->join_nodes($expr));
+        }
+    }
+    $str_buffer .= "\\n" if $new_line;
+    $push_buffer->();
+
+    # write print/printf statments
+    push @strings, '';
+    while (@args) {
+        my $node = shift @args;
+        if ($node->kind eq 'STRING') {
+            if (!$strings[-1]) {
+                $strings[-1] .= $self->indent."print(";
+                $strings[-1] .= $node->to_string ;
+            } else {
+                $strings[-1] .= ", ";
+                $strings[-1] .= $node->to_string ;
+            }
+        } elsif ($node->kind eq 'SPRINTF') {
+            while (@args and $args[0]->subkind eq 'PLAIN') {
+                my $success = $node->append_to_fmt($args[0]->value);
+                if ($success) {
+                    shift @args;
+                } else {
+                    last;
+                }
+            }
+            if ($strings[-1]) {
+                $strings[-1] .= ");";
+                push @strings, '';
+            }
+            $strings[-1] .= $self->indent.$node->to_string.";";
+            substr $strings[-1], 0, 1, "";
+            push @strings, '';
+        }
+    }
+
+    # complete statement or remove trailing ""
+    if ($strings[-1]) {
+        $strings[-1] .= ");";
+    } else {
+        pop @strings;
+    }
+    # write comment
+    $strings[-1] .= $self->comment;
+
+    # join statments with new line
+    $str_buffer = join("\n", @strings);
+
+    return $str_buffer;
+
+
 }
 
 #-----------------------------------------------------------------------

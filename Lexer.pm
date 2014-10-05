@@ -3,7 +3,7 @@
 #  Lexer is a class that takes in a list of python code and performs 
 #  lexical analysis, breaking it up into node tokens. 
 #
-#  Created by Alen Bou-Haidar on 19/09/14, edited 27/9/14
+#  Created by Alen Bou-Haidar on 19/09/14, edited 5/10/14
 #
 
 package Lexer;
@@ -34,7 +34,7 @@ my $re_decimal     = qr/^([+-])?[1-9][0-9]*/;
 
 # matches assigment operators
 # =   +=   -=   *=   /=   %=   //=   &=   |=   ^=   >>=   <<=   **= 
-my $re_assignment  = qr/^(<<|>>|\*\*|\/\/|\/|[-+*%&|^])?=/;
+my $re_assignment  = qr/^(<<|>>|\*\*|\/\/|\/|[-+*%&|^])?=(?!=)/;
 
 # matches arithmetic operators
 # +   -   *   /   **   %    //
@@ -61,7 +61,7 @@ my $re_seperator   = qr/^[,:;]/;
 my $re_comment     = qr/^\s*#.*/;
 
 # matches any whitespace characters
-my $re_whitespace  = qr/^\s*/;
+my $re_whitespace  = qr/^\s+/;
 
 # matches any identifier; does not match a call 
 my $re_identifier  = qr/^[a-z_]\w*(\s*\.\s*(?!\w+\s*\()[a-z_]\w*)*/i;
@@ -139,7 +139,6 @@ sub tokenize {
         # consume $str and create node tokens.
         while($str) {
             $node = $self->_extract_node(\$str, $prev_kind, $brace_stk);
-                
             if ($node->kind eq 'WHITESPACE') {
                 # ignore any whitespace
                 next;
