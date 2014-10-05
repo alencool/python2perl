@@ -3,7 +3,7 @@
 #  Defines is a set of classes that represent compound statments in 
 #  python for use in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 26/09/14, edited 4/10/14
+#  Created by Alen Bou-Haidar on 26/09/14, edited 5/10/14
 #
 
 
@@ -81,7 +81,7 @@ use base 'Node::Compound';
 
 sub _endbody {
     my ($self) = @_;
-    my $has_end = !($self->next and $self->next->kind ~~ ['ELSE', 'ELIF']);
+    my $has_end = !($self->next and $self->next->kind ~~ ['ELSE', 'ELSIF']);
     return  ($has_end? $self->indent.'}' : '');
 }
 
@@ -91,8 +91,8 @@ use base 'Node::If';
 
 sub _header {
     my ($self, $name) = @_;
-    my $exp = $self->children->get_list(0)->to_string_conditional;
-    return $self->indent.'}'.$name.$exp.' {'.$self->comment;
+    my $exp = $self->children->get_single->to_string_conditional;
+    return $self->indent.'} '.$name.$exp.' {'.$self->comment;
 }
 
 #-----------------------------------------------------------------------
@@ -111,11 +111,6 @@ sub to_string {
 #-----------------------------------------------------------------------
 package Node::While;
 use base 'Node::Compound';
-
-# sub to_string {
-#     my ($self) = @_;
-#     return $self->SUPER::to_string('while');
-# }
 
 #-----------------------------------------------------------------------
 package Node::Sub;

@@ -498,6 +498,27 @@ use base 'Node::Call';
 package Node::CallRange;
 use base 'Node::Call';
 
+# range(i)      => 0 .. i-1
+# range(i, j)   => i .. j-1
+sub to_string {
+    my ($self) = @_;
+    my $str;
+    my $i = $self->children->get_list(0);
+    my $j = $self->children->get_list(1);
+
+    if ($j and @$j > 0) {
+        # consider 2 argument range
+        $j = $self->_nodes_minus_one($j);
+        $str = $self->join_nodes($i).'..'.$self->join_nodes($j);
+    } else {
+        # consider 1 argument range
+        $i = $self->_nodes_minus_one($i);
+        $str = '0..'.$self->join_nodes($i);
+    }
+
+    return $str;
+}
+
 #-----------------------------------------------------------------------
 package Node::MethodCall;
 use base 'Node::Call';
