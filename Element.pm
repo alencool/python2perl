@@ -495,6 +495,36 @@ sub to_string {
 package Node::CallOpen;
 use base 'Node::Call';
 
+sub to_string {
+    my ($self, $handle) = @_;    
+    my $file = $self->children->get_list(0)->[0];
+    my $mode = $self->children->get_list(1);
+    
+    # assign default handle F if none provided
+    $handle ||= 'F';
+
+    # convert mode
+    $mode = ($mode ? $mode->[0]->value : qq/"<"/ );
+    given ($mode) {
+        when ('r')  { $mode = qq/"<"/   }
+        when ('r+') { $mode = qq/"+<"/  }
+        when ('w')  { $mode = qq/">"/   }
+        when ('w+') { $mode = qq/"+>"/  }
+        when ('a')  { $mode = qq/">>"/  }
+        when ('a+') { $mode = qq/"+>>"/ }
+
+    }
+
+    # get filename
+    my $file_str = $file->to_string;
+    my $file_val = ($file->kind eq 'STRING' ? $file->value : $file_str);
+
+    my $str = qq/open($handle, $mode, $file_str) or die /;
+    $str .= qq/"\$0: can not open $file_val: \$!"/;
+    return $str;
+}
+
+
 #-----------------------------------------------------------------------
 package Node::CallSorted;
 use base 'Node::Call';
@@ -543,6 +573,18 @@ sub set_caller {
     my ($self, $caller) = @_;
     $self->caller($caller);
     $caller->parent($self);
+}
+
+#-----------------------------------------------------------------------
+package Node::CallClose;
+use base 'Node::MethodCall';
+
+# caller is fileobj
+# exactly one argument string type
+sub to_string {
+    my ($self) = @_;
+    my $cl_value = uc($self->caller->value);
+    return "close($cl_value)";
 }
 
 #-----------------------------------------------------------------------

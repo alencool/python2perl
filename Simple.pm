@@ -150,7 +150,13 @@ sub to_string {
             $string = $self->join_children;
         }
         when ('=')  {
-            $string = join(' = ', @strings);
+            if ($uno_value->subkind eq 'CALLOPEN') {
+                my $handle = uc($targets[-1]->get_single->value);
+                $string = $uno_value->to_string($handle);
+            } else {
+                $string = join(' = ', @strings);
+            }
+            
         }
         when ('*=') {
             if ($uno_target->type->kind eq 'STRING') {

@@ -339,6 +339,7 @@ sub _get_call {
         when ('open')       { $node = new Node::CallOpen }
         when ('sorted')     { $node = new Node::CallSorted }
         when ('range')      { $node = new Node::CallRange }
+        when ('.close')     { $node = new Node::CallClose }
         when ('.write')     { $node = new Node::CallWrite }
         when ('.readline')  { $node = new Node::CallReadline }
         when ('.readlines') { $node = new Node::CallReadlines }
@@ -353,7 +354,7 @@ sub _get_call {
         when ('.sub')       { $node = new Node::CallSub }
         default             { $node = new Node::Call($call) }
     }
-    
+
     return $node;
 }
 
