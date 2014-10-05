@@ -453,6 +453,11 @@ sub _on_event_add_child {
     return $add_child;
 }
 
+sub _convert_pattern {
+    my ($self, $patt) = @_;
+    $patt =~ s/\\\\/\\/g
+}
+
 #-----------------------------------------------------------------------
 package Node::CallInt;
 use base 'Node::Call';
@@ -501,7 +506,7 @@ sub to_string {
     my $mode = $self->children->get_list(1);
     
     # assign default handle F if none provided
-    $handle ||= 'F';
+    $handle = uc($handle->value);
 
     # convert mode
     $mode = ($mode ? $mode->[0]->value : qq/"<"/ );
@@ -512,7 +517,6 @@ sub to_string {
         when ('w+') { $mode = qq/"+>"/  }
         when ('a')  { $mode = qq/">>"/  }
         when ('a+') { $mode = qq/"+>>"/ }
-
     }
 
     # get filename
@@ -663,7 +667,6 @@ use base 'Node::MethodCall';
 package Node::CallSplit;
 use base 'Node::MethodCall';
 
-
 # STRING.split(DELIMITER [, MAX]) => split(DELIMITER, STRING [, MAX+1])
 # DELIMITER default ' '
 sub to_string {
@@ -715,16 +718,56 @@ sub infer_type {
 }
 
 #-----------------------------------------------------------------------
-package Node::CallMatch;
-use base 'Node::MethodCall';
-
-#-----------------------------------------------------------------------
 package Node::CallSearch;
 use base 'Node::MethodCall';
+
+# match zero or more characters anywhere inside the string
+sub to_string {
+    my ($self, $handle) = @_;    
+    my $patt = $self->children->get_list(0)->[0]->value;
+    my $text = $self->children->get_list(1)->[0]->to_string;
+    $patt = $self->_convert_pattern($patt);
+    $handle = $handle->to_string;
+
+    return "$handle = ($text =~ /$patt/)";
+}
+
+#-----------------------------------------------------------------------
+package Node::CallMatch;
+use base 'Node::CallSearch';
+
+# match zero or more characters at the beginning of string
+sub to_string {
+    my ($self, $handle) = @_;
+    my $str = $self->SUPER::to_string($handle);
+    # make sure it only matches at the start
+    $str =~ s/=~ \//=~ \/^/ if $str !~ /=~ \/^/;
+    return $str;
+}
 
 #-----------------------------------------------------------------------
 package Node::CallSub;
 use base 'Node::MethodCall';
+
+sub to_string {
+    my ($self) = @_;    
+    my $patt = $self->children->get_list(0)->[0]->value;
+    my $repl = $self->children->get_list(1)->[0]->value;
+    my $text = $self->children->get_list(2)->[0]->to_string;
+    $patt = $self->_convert_pattern($patt);
+    return "$text =~ s/$patt/$repl/g";
+}
+
+#-----------------------------------------------------------------------
+package Node::CallGroup;
+use base 'Node::MethodCall';
+
+sub to_string {
+    my ($self) = @_;
+    my $num = $self->children->get_single->value;
+    return "\$$num";
+}
+
 
 #-----------------------------------------------------------------------
 package Node::In;

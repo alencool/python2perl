@@ -352,6 +352,7 @@ sub _get_call {
         when ('.match')     { $node = new Node::CallMatch }
         when ('.search')    { $node = new Node::CallSearch }
         when ('.sub')       { $node = new Node::CallSub }
+        when ('.group')     { $node = new Node::CallGroup }
         default             { $node = new Node::Call($call) }
     }
 

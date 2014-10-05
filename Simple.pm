@@ -123,7 +123,7 @@ sub to_string {
     my $uno_target; # contains the first left most target node
     my $uno_value;  # contains single value node if only one
     my $is_single;  # true if only a single value
-
+    my $calls = ['CALLOPEN', 'CALLMATCH', 'CALLSEARCH', 'CALLSUB'];
     my @targets = @{$self->targets};
     for my $target (@targets) {
         $string = $self->join_multilist($target, 'TARGET');
@@ -150,13 +150,12 @@ sub to_string {
             $string = $self->join_children;
         }
         when ('=')  {
-            if ($uno_value->subkind eq 'CALLOPEN') {
-                my $handle = uc($targets[-1]->get_single->value);
+            if ($uno_value->subkind ~~ $calls) {
+                my $handle = $targets[-1]->get_single;
                 $string = $uno_value->to_string($handle);
             } else {
                 $string = join(' = ', @strings);
             }
-            
         }
         when ('*=') {
             if ($uno_target->type->kind eq 'STRING') {
