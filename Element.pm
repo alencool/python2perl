@@ -663,6 +663,24 @@ use base 'Node::MethodCall';
 package Node::CallKeys;
 use base 'Node::MethodCall';
 
+sub to_string {
+    my ($self) = @_;
+    my $str = $self->caller->to_string('TARGET');
+    given ($self->caller->kind) {
+        when ('IDENTIFIER') { $str = "keys($str)" }
+        default             { $str = "keys(\%{$str})" }
+    }
+    return $str;
+}
+
+# returns a type ARRAY of STRING's
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->type(new Type([new Type('STRING')]));
+    return $self->type;
+}
+
 #-----------------------------------------------------------------------
 package Node::CallSplit;
 use base 'Node::MethodCall';
@@ -767,7 +785,6 @@ sub to_string {
     my $num = $self->children->get_single->value;
     return "\$$num";
 }
-
 
 #-----------------------------------------------------------------------
 package Node::In;
