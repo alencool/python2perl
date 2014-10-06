@@ -133,7 +133,7 @@ sub to_string {
     if (@targets) {
         $uno_target = $targets[-1]->get_single;
         $uno_value = $self->children->get_single;
-        $is_single = $self->children->is_empty;
+        $is_single = $self->children->is_single;
         if ($is_single and $targets[-1]->is_single and 
             $uno_target->kind ne 'SUBSCRIPT') {
             $string = $self->join_children('EXPAND');

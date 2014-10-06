@@ -211,7 +211,29 @@ sub translate_sprintf {
 
 # attempts to contatinate lits using perls list flattening
 sub translate_list_add {
-
+    my ($self) = @_;
+    my @lists = $self->children->get_lists;
+    for my $list (@lists) {
+        for (my $i = 1; $i < @$list; $i++) {
+            if ($list->[$i]->kind eq 'ARITHMETIC' and 
+                $list->[$i]->value eq '+' and
+                $list->[$i - 1]->type->kind eq 'ARRAY') {
+                # found list +
+                my $flat_list = new Node::Flat::;
+                $flat_list->add_child($list->[$i - 1]);
+                while ($list->[$i] and
+                       $list->[$i]->kind eq 'ARITHMETIC' and 
+                       $list->[$i]->value eq '+') {
+                    $flat_list->add_child($list->[$i + 1]);
+                    splice @$list, $i, 2;
+                }
+                splice @$list, $i-1, 1, $flat_list;
+            }
+        }
+        for my $node (@$list) {
+            $node->translate_list_add;
+        }    
+    }
 }
 
 # attempts to replace x not in y => !(x in y)

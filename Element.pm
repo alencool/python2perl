@@ -126,7 +126,7 @@ sub infer_type {
     my ($type, $multi);
     $multi = $self->children;
     $type = $self->infer_from_multilist($type_manager, $multi);
-
+    $self->type($type);
     return $type;
 
 }
@@ -455,7 +455,7 @@ sub _on_event_add_child {
 
 sub _convert_pattern {
     my ($self, $patt) = @_;
-    $patt =~ s/\\\\/\\/g
+    $patt =~ s/\\\\/\\/g;
 }
 
 #-----------------------------------------------------------------------
@@ -506,7 +506,8 @@ sub to_string {
     my $mode = $self->children->get_list(1);
     
     # assign default handle F if none provided
-    $handle = uc($handle->value);
+    $handle = ($handle ? uc($handle->value) : 'F');
+
 
     # convert mode
     $mode = ($mode ? $mode->[0]->value : qq/"<"/ );
@@ -561,6 +562,7 @@ sub infer_type {
     }
     return $self->type;
 }
+
 
 #-----------------------------------------------------------------------
 package Node::CallRange;
