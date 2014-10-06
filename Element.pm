@@ -535,10 +535,13 @@ use base 'Node::Call';
 
 sub to_string {
     my ($self) = @_;
-    my $str = $self->children->get_single->to_string('EXPAND');
-    my $is_nums = ($self->type->get_query(0)->kind eq 'NUMBER');
+    my $node = $self->children->get_single;
+    my $str = $node->to_string('EXPAND');
+    my $is_num = ($self->type->get_query(0)->kind eq 'NUMBER');
 
-    if ($is_nums) {
+    if ($node->type->kind eq 'HASH') {
+        $str = "sort(keys($str))"
+    } elsif ($is_num) {
         $str = "sort({\$a <=> \$b} $str)"
     } else {
         $str = "sort($str)"
@@ -550,7 +553,12 @@ sub to_string {
 sub infer_type {
     my ($self, $type_manager) = @_;
     $self->SUPER::infer_type($type_manager);
-    $self->type($self->children->get_single->type);
+    my $node = $self->children->get_single;
+    if ($node->type->kind eq 'ARRAY') {
+        $self->type($node->type);
+    } else {
+        $self->type(new Type([new Type('STRING')]));
+    }
     return $self->type;
 }
 
