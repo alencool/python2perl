@@ -103,9 +103,31 @@ use base 'Node::Elsif';
 package Node::For;
 use base 'Node::Compound';
 
-sub to_string {
-    my ($self) = @_;
-    return $self->SUPER::to_string('foreach');
+# python:   for TARGET in ITERABLE:
+# perl:     foreach my TARGET (LIST) { [#comment]
+sub _header {
+    my ($self, $name) = @_;
+    my $exp_lst = $self->children->get_list(0);
+    my $target = $exp_lst->[0]->to_string('TARGET');
+    my $iter = $exp_lst->[-1];
+    my ($str, $list);
+
+    given ($iter->subkind) {
+        when ('ARGV')           { $list = '@ARGV' }
+        when ('STDIN')          { $list = '<STDIN>'}
+        when ('SUBSCRIPT')      { $list = $iter->to_string('EXPAND')}
+        when ('IDENTIFIER')     { $list = $iter->to_string('EXPAND')}
+        when ('LIST')           { $list = $iter->to_string('EXPAND')}
+        default                 { $list = $iter->to_string }
+    }
+
+    if ($iter->subkind eq 'CALLFILEINPUT') {
+        $str = "while ($target = <>) {";
+    } else {
+        $str = "foreach $target ($list) {";
+    }
+
+    return $self->indent.$str.$self->comment;
 }
 
 #-----------------------------------------------------------------------
