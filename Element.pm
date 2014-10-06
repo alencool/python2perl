@@ -579,6 +579,13 @@ sub set_caller {
     $caller->parent($self);
 }
 
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->caller->infer_type;
+    return $self->type;
+}
+
 #-----------------------------------------------------------------------
 package Node::CallClose;
 use base 'Node::MethodCall';
@@ -655,9 +662,47 @@ use base 'Node::MethodCall';
 package Node::CallAppend;
 use base 'Node::MethodCall';
 
+sub to_string {
+    my ($self) = @_;
+    my $lst_org = $self->caller->to_string('EXPAND');
+    my $lst_app = $self->children->get_single->to_string('EXPAND');
+    return "push($lst_org, $lst_app)";
+}
+
 #-----------------------------------------------------------------------
 package Node::CallPop;
 use base 'Node::MethodCall';
+
+sub to_string {
+    my ($self) = @_;
+    my $str = $self->caller->to_string('EXPAND');
+
+    if (not $self->is_leaf){
+        $str = "pop($str)";
+    } else {
+        my $key = $self->_get_key;
+        $str = "splice($str, $key, 1)";
+    }
+    return $str;
+}
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    my $type = $self->caller->type->get_query($self->_get_key);
+    $self->type($type);
+    return $self->type;
+}
+
+sub _get_key {
+    my ($self) = @_;
+    my $key = -1;
+    if (not $self->is_leaf){
+        $key = $self->children->get_single;
+        $key = ($key->kind eq 'NUMBER' ? $key->value : -1);
+    }
+    return $key;
+}
 
 #-----------------------------------------------------------------------
 package Node::CallKeys;
