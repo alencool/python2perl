@@ -532,6 +532,28 @@ sub to_string {
 #-----------------------------------------------------------------------
 package Node::CallSorted;
 use base 'Node::Call';
+
+sub to_string {
+    my ($self) = @_;
+    my $str = $self->children->get_single->to_string('EXPAND');
+    my $is_nums = ($self->type->get_query(0)->kind eq 'NUMBER');
+
+    if ($is_nums) {
+        $str = "sort({\$a <=> \$b} $str)"
+    } else {
+        $str = "sort($str)"
+    }
+
+    return $str;
+}
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $self->type($self->children->get_single->type);
+    return $self->type;
+}
+
 #-----------------------------------------------------------------------
 package Node::CallRange;
 use base 'Node::Call';
