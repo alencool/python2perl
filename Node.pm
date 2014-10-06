@@ -4,7 +4,7 @@
 #  structure of python code. It can be used to store information or 
 #  other nodes in the creation of a tree.
 #
-#  Created by Alen Bou-Haidar on 20/09/14, edited 5/10/14
+#  Created by Alen Bou-Haidar on 20/09/14, edited 6/10/14
 #
 
 use strict;
@@ -267,7 +267,6 @@ sub infer_from_list {
     my ($self, $type_manager, @nodes) = @_;
     my $type = new Type('NUMBER');
     for my $node (@nodes) {
-        
         my $node_t = $node->infer_type($type_manager);
         if ($node_t->kind eq 'HASH') {
             $type = $node_t;

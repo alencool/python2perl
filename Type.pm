@@ -3,7 +3,7 @@
 #  For the storage and retrieval of type information for identifiers. 
 #  Types inlcude: ARRAY, HASH, STRING, NUMBER
 #
-#  Created by Alen Bou-Haidar on 27/09/14, edited 27/9/14
+#  Created by Alen Bou-Haidar on 27/09/14, edited 6/10/14
 #
 use strict;
 use warnings;

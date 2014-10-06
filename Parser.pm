@@ -3,7 +3,7 @@
 #  Defines a Parser class, for the creation of a abstract syntax tree 
 #  like structure from a sequence of node tokens.
 #
-#  Created by Alen Bou-Haidar on 19/09/14, edited 5/10/14
+#  Created by Alen Bou-Haidar on 19/09/14, edited 6/10/14
 #
 
 package Parser;
