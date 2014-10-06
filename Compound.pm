@@ -120,14 +120,26 @@ sub _header {
         when ('LIST')           { $list = $iter->to_string('EXPAND')}
         default                 { $list = $iter->to_string }
     }
-
-    if ($iter->subkind eq 'CALLFILEINPUT') {
-        $str = "while ($target = <>) {";
+    if ($iter->subkind eq 'CALLOPEN') {
+        $str = $self->indent.$iter->to_string()."\n";
+        $str .= $self->indent."while ($target = <F>) {";
+    } elsif ($iter->subkind eq 'CALLFILEINPUT') {
+        $str = $self->indent."while ($target = <>) {";
     } else {
-        $str = "foreach $target ($list) {";
+        $str = $self->indent."foreach $target ($list) {";
     }
 
-    return $self->indent.$str.$self->comment;
+    return $str.$self->comment;
+}
+
+sub _endbody {
+    my ($self) = @_;
+    my $str = $self->indent."}";    
+    my $iter = $self->children->get_list(0)->[-1];
+    if ($iter->subkind eq 'CALLOPEN') {
+        $str .= "\n".$self->indent."close(F);";
+    } 
+    return $str;
 }
 
 #-----------------------------------------------------------------------
