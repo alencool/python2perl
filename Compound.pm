@@ -28,6 +28,18 @@ sub _init {
     $self->complete(FALSE);
 }
 
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    if (not $type_manager) {
+        $type_manager = new Type::Manager;
+    }
+    my $list = $self->children->get_list(0);
+    for my $node (@$list) {
+        $node->infer_type($type_manager);
+    }
+}
+
+
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = TRUE;
@@ -107,7 +119,8 @@ use base 'Node::Compound';
 # perl:     foreach my TARGET (LIST) { [#comment]
 sub _header {
     my ($self, $name) = @_;
-    my $exp_lst = $self->children->get_list(0);
+    my $exp = $self->children->get_single;
+    my $exp_lst = $exp->children->get_list(0);
     my $target = $exp_lst->[0]->to_string('TARGET');
     my $iter = $exp_lst->[-1];
     my ($str, $list);
@@ -121,7 +134,7 @@ sub _header {
         default                 { $list = $iter->to_string }
     }
     if ($iter->subkind eq 'CALLOPEN') {
-        $str = $self->indent.$iter->to_string()."\n";
+        $str = $self->indent.$iter->to_string().";\n";
         $str .= $self->indent."while ($target = <F>) {";
     } elsif ($iter->subkind eq 'CALLFILEINPUT') {
         $str = $self->indent."while ($target = <>) {";
@@ -149,10 +162,43 @@ use base 'Node::Compound';
 #-----------------------------------------------------------------------
 package Node::Sub;
 use base 'Node::Compound';
+Node::Sub->mk_accessors(qw(param_names param_types
+                           type_manager local_vars));
 
-sub to_string {
+# attempt to deduce its representive type
+# sub infer_type {
+#     my ($self, $type_manager) = @_;
+#     $self->type_manager($type_manager);
+
+#     $type_manager->push_frame;
+#     $self->infer_from_multilist($type_manager, $self->children);
+#     $self->local_vars($type_manager->pop_frame);
+
+
+#     # iterate over first nodes of the list
+#     # find a return node
+#     # acquire its type
+#         # NUMBER
+#         # HASH
+#         # ARRAY
+#         # STRING
+
+#     # register func type
+
+
+
+
+#     return $self->type;
+# }
+
+sub _header {
     my ($self) = @_;
-    return $self->SUPER::to_string('sub');
+    my $func = $self->children->get_single->children->get_single;
+    my $name = $func->value;
+    my $str = $self->indent."sub $name {".$self->comment;
+    # my $arg_lst = $exp->children->get_list(0);
+
+    return $str;
 }
 
 #-----------------------------------------------------------------------

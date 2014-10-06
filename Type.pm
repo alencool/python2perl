@@ -42,7 +42,6 @@ sub get_query {
     my ($self, $key) = @_;
     my $type = new Type('NUMBER');
     my $data = $self->data;
-
     # set type from hash key
     my $_hash = sub {
         if (%$data) {
@@ -58,6 +57,11 @@ sub get_query {
     # set type from array index
     my $_array = sub {
         if (@$data) {
+            if ($key !~ /^\d+?$/) {
+                $key = 0;
+            } else {
+                $key = int($key);
+            }
             if (defined $data->[$key]) {
                 $type = $data->[$key];
             } else {
@@ -79,7 +83,6 @@ sub get_query {
 sub set_query {
     my ($self, $key, $type) = @_;
     my $data = $self->data;
-
     if ($self->kind eq 'ARRAY') {
         $key = int(eval($key) || 0);
         $data->[$key] = $type;
@@ -102,7 +105,11 @@ package Type::Manager;
 # constructor
 sub new {
     my ($class, @args) = @_;
-    my $self = {frames => [{}]};
+    my $self = {frames => [{}],
+                functions => {},
+                kinds => {},
+                };
+
     my $object = bless $self, $class;
     return $object;
 }
@@ -121,28 +128,52 @@ sub get {
     return $value;
 }
 
-sub frames {
-    my ($self) = @_;
-    return $self->{frames};
-}
-
 # stores type for name
 sub set {
     my ($self, $name, $type) = @_;
     my $frame = $self->frames->[0];
+    my $kind = $type->kind;
+    my $kinds = $self->{kinds};
+    $kinds->{$name}{$kind} = 1;
     $frame->{$name} = $type;
+
+}
+
+# returns type from function name
+sub get_func {
+    my ($self, $name) = @_;
+    my $value = undef;
+
+    if ($name ~~ $self->{functions}) {
+        $value = $self->{functions}->{$name};
+    }
+    return $value;
+}
+
+# stores type for function name
+sub set_func {
+    my ($self, $name, $type) = @_;
+    $self->{functions}->{$name} = $type;
+
+}
+
+sub frames {
+    my ($self) = @_;
+    return $self->{frames};
 }
 
 # create new stack frame
 sub push_frame {
     my ($self) = @_;
     unshift @{$self->frames}, {};
+    $self->{kinds} = {};
 }
 
 # remove top frame from stack
 sub pop_frame {
     my ($self) = @_;
     shift @{$self->frames};
+    return $self->{kinds};
 }
 
 

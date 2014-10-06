@@ -165,6 +165,7 @@ sub infer_type {
     }
 
     $type = new Type($dict);
+    $self->type($type);
     return $type;
 }
 
@@ -183,6 +184,16 @@ sub to_string {
     }
     return $str;
 }
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    if ($self->type->kind ne 'ARRAY') {
+        $self->type(new Type([$self->type]));
+    }
+    return $self->type;
+}
+
 
 #-----------------------------------------------------------------------
 package Node::Flat;
@@ -240,6 +251,7 @@ sub to_string {
     
     my $signature = $self->_get_signature;
     my $str;
+
 
     if ($signature ~~ "") {
         $str = $self->caller->to_string($context);
@@ -392,11 +404,13 @@ sub infer_type {
     $type ||= new Type('NUMBER');
     $self->type($type);
     return $self->type;
+
 }
 
 sub imply_type {
     my ($self, $type_manager, $type) = @_;
     $self->type($type);
+
     $type_manager->set($self->value, $type);
 }
 

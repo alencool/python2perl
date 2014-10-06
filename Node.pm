@@ -195,8 +195,10 @@ sub translate_sprintf {
         for (my $i = 0; $i < @$list; $i++) {
             if ($list->[$i]->kind eq 'ARITHMETIC' and 
                 $list->[$i]->value eq '%' and
-                $list->[$i - 1]->type->kind eq 'STRING') {
+                ($list->[$i - 1]->type->kind eq 'STRING' or 
+                $list->[$i - 1]->kind eq 'STRING')) {
                 # found 'fmt_str % args'
+
                 my $sprintf = new Node::Sprintf::;
                 $sprintf->add_child($list->[$i - 1]);   # fmt string
                 $sprintf->add_child($list->[$i + 1]);   # args
@@ -267,7 +269,9 @@ sub infer_from_list {
     my ($self, $type_manager, @nodes) = @_;
     my $type = new Type('NUMBER');
     for my $node (@nodes) {
+        
         my $node_t = $node->infer_type($type_manager);
+
         if ($node_t->kind eq 'HASH') {
             $type = $node_t;
             last;
@@ -290,7 +294,6 @@ sub infer_from_multilist {
     my ($self, $type_manager, $multi) = @_;
     my (@types, $type);
     my @lists = $multi->get_lists;
-
     for my $list (@lists){
         if (@$list) {
             $type = $self->infer_from_list($type_manager, @$list);

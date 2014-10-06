@@ -80,7 +80,6 @@ sub infer_type {
 
     # infer and assign types for targets
     $self->_assign_types($type_manager) if $self->assignment;
-
     return $self->type;
 }
 
@@ -89,7 +88,6 @@ sub _assign_types {
     my (@types, @targets, $node, $type);
 
     @targets = @{$self->targets};
-
     # get types
     if ($self->type->kind eq 'ARRAY' and $targets[-1]->list_count > 1) {
         @types = @{$self->type->data};
@@ -97,6 +95,9 @@ sub _assign_types {
         @types = ($self->type->data);
     }
     
+
+    map {$self->infer_from_multilist($type_manager, $_)} @targets;
+
     # assign types to each target
     if ($self->assignment eq '=') {
         for my $target (@targets) {
@@ -112,7 +113,7 @@ sub _assign_types {
             }
         }
     }
-    map {$self->infer_from_multilist($type_manager, $_)} @targets;
+   
 
 }
 
@@ -151,6 +152,7 @@ sub to_string {
         }
         when ('=')  {
             if ($uno_value->subkind ~~ $calls) {
+
                 my $handle = $targets[-1]->get_single;
                 $string = $uno_value->to_string($handle);
             } else {
@@ -216,6 +218,7 @@ sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
     if ($node->kind eq 'ASSIGNMENT') {
+
         # transformed to assignment statement, extract targets
         $self->_peel_multilist;
         $self->children->chomp;
@@ -318,8 +321,10 @@ sub to_string {
                 $strings[-1] .= ");";
                 push @strings, '';
             }
-            $strings[-1] .= $self->indent.$node->to_string.";";
-            substr $strings[-1], 0, 1, "";
+            my $str = $node->to_string;
+            substr $str, 0, 1, "";
+            $strings[-1] .= $self->indent.$str.";";
+            
             push @strings, '';
         }
     }
@@ -335,6 +340,10 @@ sub to_string {
 
     # join statments with new line
     $str_buffer = join("\n", @strings);
+
+    if ($self->children->is_empty) {
+        $str_buffer = $self->indent.qq/print("\\n");/;
+    }
 
     return $str_buffer;
 

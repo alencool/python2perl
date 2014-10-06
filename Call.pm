@@ -50,6 +50,14 @@ sub _on_event_add_child {
 sub _convert_pattern {
     my ($self, $patt) = @_;
     $patt =~ s/\\\\/\\/g;
+    return $patt;
+}
+
+sub to_string {
+    my ($self) = @_;
+    my $args = $self->join_children;
+    my $name = $self->value;
+    return qq/$name($args)/;
 }
 
 #-----------------------------------------------------------------------
@@ -100,8 +108,11 @@ sub to_string {
     my $mode = $self->children->get_list(1);
     
     # assign default handle F if none provided
-    $handle = ($handle ? uc($handle->value) : 'F');
-
+    if ($handle and $handle eq 'EXPAND') {
+        $handle = 'F';
+    } else {
+        $handle = ($handle ? uc($handle->value) : 'F');
+    }
 
     # convert mode
     $mode = ($mode ? $mode->[0]->value : qq/"<"/ );
@@ -208,7 +219,7 @@ sub set_caller {
 sub infer_type {
     my ($self, $type_manager) = @_;
     $self->SUPER::infer_type($type_manager);
-    $self->caller->infer_type;
+    $self->caller->infer_type($type_manager);
     return $self->type;
 }
 
@@ -364,13 +375,13 @@ sub to_string {
     my $string_arg = $self->caller->to_string;
     my $deli = $self->children->get_list(0);
     my $max = $self->children->get_list(1);
-    $deli = (@$deli ? $self->join_nodes($deli) : ' ');
+    $deli = (@$deli ? $deli->[0]->value : ' ');
     $max = ($max ? $self->join_nodes($self->_nodes_plus_one($max)) : undef);
 
     if (defined $max) {
-         $str = "split($deli, $string_arg, $max)";
+         $str = "split(/\\Q$deli\\E/, $string_arg, $max)";
     } else {
-         $str = "split($deli, $string_arg)";
+         $str = "split(/\\Q$deli\\E/, $string_arg)";
     }
 
     return $str;
@@ -384,6 +395,8 @@ sub infer_type {
     return $self->type;
 }
 
+ 
+ 
 
 #-----------------------------------------------------------------------
 package Node::CallJoin;
@@ -412,13 +425,16 @@ use base 'Node::MethodCall';
 
 # match zero or more characters anywhere inside the string
 sub to_string {
-    my ($self, $handle) = @_;    
-    my $patt = $self->children->get_list(0)->[0]->value;
-    my $text = $self->children->get_list(1)->[0]->to_string;
-    $patt = $self->_convert_pattern($patt);
-    $handle = $handle->to_string;
-
-    return "$handle = ($text =~ /$patt/)";
+    my ($self, $handle) = @_;
+    my $str = '';
+    if ($handle ne 'EXPAND') {
+        my $patt = $self->children->get_list(0)->[0]->value;
+        my $text = $self->children->get_list(1)->[0]->to_string;
+        $patt = $self->_convert_pattern($patt);
+        $handle = $handle->to_string;
+        $str = "$handle = ($text =~ /$patt/)";
+    }
+    return $str;
 }
 
 #-----------------------------------------------------------------------
@@ -428,9 +444,12 @@ use base 'Node::CallSearch';
 # match zero or more characters at the beginning of string
 sub to_string {
     my ($self, $handle) = @_;
-    my $str = $self->SUPER::to_string($handle);
-    # make sure it only matches at the start
-    $str =~ s/=~ \//=~ \/^/ if $str !~ /=~ \/^/;
+    my $str = '';
+    if ($handle ne 'EXPAND') {
+        $str = $self->SUPER::to_string($handle);
+        # make sure it only matches at the start
+        $str =~ s/=~ \//=~ \/^/ if $str !~ /=~ \/^/;
+    }
     return $str;
 }
 
@@ -439,12 +458,17 @@ package Node::CallSub;
 use base 'Node::MethodCall';
 
 sub to_string {
-    my ($self) = @_;    
-    my $patt = $self->children->get_list(0)->[0]->value;
-    my $repl = $self->children->get_list(1)->[0]->value;
-    my $text = $self->children->get_list(2)->[0]->to_string;
-    $patt = $self->_convert_pattern($patt);
-    return "$text =~ s/$patt/$repl/g";
+    my ($self, $handle) = @_;
+    my $str = '';
+    if ($handle ne 'EXPAND') {
+        my $patt = $self->children->get_list(0)->[0]->value;
+        my $repl = $self->children->get_list(1)->[0]->value;
+        my $text = $self->children->get_list(2)->[0]->to_string;
+        $patt = $self->_convert_pattern($patt);
+        $handle = $handle->to_string;
+        $str = "($handle = $text) =~ s/$patt/$repl/g";
+    }
+    return $str;
 }
 
 #-----------------------------------------------------------------------
@@ -455,6 +479,12 @@ sub to_string {
     my ($self) = @_;
     my $num = $self->children->get_single->value;
     return "\$$num";
+}
+
+sub infer_type {
+    my ($self) = @_;
+    $self->type(new Type('STRING'));
+    return $self->type;
 }
 
 1;
