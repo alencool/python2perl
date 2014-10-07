@@ -1,0 +1,22 @@
+#!/usr/bin/python
+
+# Print an asci dragon
+print "\n"
+print "                    .     _///_,\n"   
+print "                     .      / ` ' '>\n"
+print "                       )   o'  __/_'>\n"  
+print "                         /  _/  )_\'>\n"
+print "                       ' \"__/   /_/\\_>\n"
+print "                           ____/_/_/_/\n"
+print "                          /,---, _/ /\n"
+print "                         ""  /_/_/_/\n"
+print "                            /____                 \n"
+print "                              \\_\\_\\\\_               )\n"
+print "                            \'__\\_\\_\\_\\__            ).\n"
+print "                            //____|___\\__)           )_/\n"
+print "                            |  _  \'___'_           /'\n"
+print "                             \\_ -'\'___'_\\      __,'_'\n"
+print "                             __) \\  \\____   __/.__,'\n"
+print "                          ,,-,__\\  '\", __\\_\\/. __,'\n"
+print "                                       '\"./_._._-'\n"
+print "\n"
