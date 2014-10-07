@@ -78,7 +78,6 @@ sub _body {
     my ($self) = @_;
     my $list = $self->children->get_list(0);
     my @strings = map {$_->to_string} @$list;
-    shift @strings;
     return join("\n", @strings);
 }
 
@@ -188,6 +187,7 @@ use base 'Node::Compound';
 #-----------------------------------------------------------------------
 package Node::Sub;
 use base 'Node::Compound';
+use Constants;
 Node::Sub->mk_accessors(qw(param_seq local_seq return_type));
 
 sub _init {
@@ -200,12 +200,13 @@ sub _init {
 sub infer_type {
     my ($self, $type_manager) = @_;
     my ($name) = $self->_get_names;
-    $self->type_manager->register_func($name, $self);
+    $type_manager->register_func($name, $self);
 }
 
 # attempt to deduce its representive type
 sub infer_type_params {
     my ($self, $type_manager, @param_types) = @_;
+
     if (not defined $self->return_type) {    
         my ($name, @params) = $self->_get_names;
         my @param_seq;
@@ -216,9 +217,12 @@ sub infer_type_params {
             push @param_seq, ($params[$i], $param_types[$i]->kind);
         }
         $self->param_seq(\@param_seq); 
-        $self->infer_from_multilist($type_manager, $self->children);
+        my @exprs = @{$self->children->get_list(0)};
+        shift @exprs;  # remove function parameters
+        $self->infer_from_list(\@exprs);
         my ($type, $seq) = $type_manager->pop_frame;
-        $self->return_type($type);
+        
+        $self->return_type($type || new Type('NUMBER'));
         $self->local_seq($seq);
     }
 
@@ -251,9 +255,9 @@ sub _header {
         $kind = shift @param_seq;
         $declared{$name}{$kind} = 1;
         given ($kind) {
-            when ('HASH')  { $str .= "\n$indent%$name = %{shift(\@_)};" }
-            when ('ARRAY') { $str .= "\n$indent\@$name = \@{shift(\@_)};" }
-            default        { $str .= "\n$indent\$$name = shift(\@_);" }
+            when ('HASH')  { $str .= "\n$indent"."my %$name = %{shift(\@_)};" }
+            when ('ARRAY') { $str .= "\n$indent"."my \@$name = \@{shift(\@_)};" }
+            default        { $str .= "\n$indent"."my \$$name = shift(\@_);" }
         }
     }
 
@@ -272,6 +276,14 @@ sub _header {
     }
 
     return $str;
+}
+
+sub _body {
+    my ($self) = @_;
+    my @list = @{$self->children->get_list(0)};
+    shift @list;
+    my @strings = map {$_->to_string} @list;
+    return join("\n", @strings);
 }
 
 #-----------------------------------------------------------------------

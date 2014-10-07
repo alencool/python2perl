@@ -50,6 +50,7 @@ sub parse {
             # and stmt is a one liner so push new indent level 
             $indent_stk->push($indent_stk->top + 4);
         }
+
         $top->add_child($node);
         if ($top->complete) {
             $node = $incomp_stk->pop;

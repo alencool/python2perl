@@ -36,7 +36,6 @@ sub infer_type {
     my ($self, $type_manager) = @_;
     my $type = $self->SUPER::infer_type($type_manager);
     if ($self->subkind eq 'CALL') {
-        print $self->value;
         my @param_types;
         if ($type->kind ~~ ['NUMBER', 'STRING', 'HASH']) {
             push @param_types, $type;

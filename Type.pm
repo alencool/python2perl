@@ -102,7 +102,7 @@ sub set_query {
 
 package Type::Manager;
 use base 'Class::Accessor';
-Type::Manager->mk_accessors(qw(data frames seq ftype));
+Type::Manager->mk_accessors(qw(data frames seq ftype funcs));
 
 # constructor
 sub new {
