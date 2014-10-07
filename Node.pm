@@ -269,9 +269,10 @@ sub infer_from_list {
     my ($self, $type_manager, @nodes) = @_;
     my $type = new Type('NUMBER');
     for my $node (@nodes) {
-        
-        my $node_t = $node->infer_type($type_manager);
-
+        $node->infer_type($type_manager);
+    }
+    for my $node (@nodes) {
+        my $node_t = $node->type;;
         if ($node_t->kind eq 'HASH') {
             $type = $node_t;
             last;

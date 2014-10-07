@@ -400,7 +400,7 @@ sub to_string {
 
 sub infer_type {
     my ($self, $type_manager) = @_;
-    my $type = $type_manager->get($self->value);
+    my $type = $type_manager->get_type($self->value);
     $type ||= new Type('NUMBER');
     $self->type($type);
     return $self->type;
@@ -411,7 +411,7 @@ sub imply_type {
     my ($self, $type_manager, $type) = @_;
     $self->type($type);
 
-    $type_manager->set($self->value, $type);
+    $type_manager->set_type($self->value, $type);
 }
 
 #-----------------------------------------------------------------------

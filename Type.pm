@@ -101,13 +101,15 @@ sub set_query {
 #-----------------------------------------------------------------------
 
 package Type::Manager;
+use base 'Class::Accessor';
+Type::Manager->mk_accessors(qw(data frames kinds));
 
 # constructor
 sub new {
     my ($class, @args) = @_;
-    my $self = {frames => [{}],
-                functions => {},
-                kinds => {},
+    my $self = {frames  => [{}],    # new frame when inside function
+                funcs   => {},      # stores registered functions
+                kinds   => {},      # declared vars names, kinds
                 };
 
     my $object = bless $self, $class;
@@ -115,10 +117,9 @@ sub new {
 }
 
 # returns type from name
-sub get {
+sub get_type {
     my ($self, $name) = @_;
     my $value = undef;
-
     for my $frame (@{$self->frames}) {
         if ($name ~~ $frame) {
             $value = $frame->{$name};
@@ -129,51 +130,39 @@ sub get {
 }
 
 # stores type for name
-sub set {
+sub set_type {
     my ($self, $name, $type) = @_;
     my $frame = $self->frames->[0];
-    my $kind = $type->kind;
-    my $kinds = $self->{kinds};
-    $kinds->{$name}{$kind} = 1;
+    $self->kinds->{$name}{$type->kind} = 1;
     $frame->{$name} = $type;
-
 }
 
-# returns type from function name
-sub get_func {
-    my ($self, $name) = @_;
-    my $value = undef;
-
-    if ($name ~~ $self->{functions}) {
-        $value = $self->{functions}->{$name};
-    }
-    return $value;
+# register function to be notified of param types later
+sub register_func {
+    my ($self, $name, $node) = @_;
+    $self->funcs->{$name} = $node;
 }
 
-# stores type for function name
-sub set_func {
-    my ($self, $name, $type) = @_;
-    $self->{functions}->{$name} = $type;
-
-}
-
-sub frames {
-    my ($self) = @_;
-    return $self->{frames};
+# request function type, passing param types
+sub request_func {
+    my ($self, $name, @params) = @_;
+    my $node = $self->funcs->{$name};
+    my $type = $node->infer_type_params($self, @params);
+    return $type;
 }
 
 # create new stack frame
 sub push_frame {
     my ($self) = @_;
     unshift @{$self->frames}, {};
-    $self->{kinds} = {};
+    $self->kinds({});
 }
 
 # remove top frame from stack
 sub pop_frame {
     my ($self) = @_;
     shift @{$self->frames};
-    return $self->{kinds};
+    return $self->kinds;
 }
 
 

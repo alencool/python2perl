@@ -168,28 +168,30 @@ Node::Sub->mk_accessors(qw(param_names param_types
 # attempt to deduce its representive type
 # sub infer_type {
 #     my ($self, $type_manager) = @_;
-#     $self->type_manager($type_manager);
-
-#     $type_manager->push_frame;
-#     $self->infer_from_multilist($type_manager, $self->children);
-#     $self->local_vars($type_manager->pop_frame);
-
-
-#     # iterate over first nodes of the list
-#     # find a return node
-#     # acquire its type
-#         # NUMBER
-#         # HASH
-#         # ARRAY
-#         # STRING
-
-#     # register func type
-
-
-
-
-#     return $self->type;
+#     $self->type_manager->register_func($name, $self)
+#                                         #TODO GET func name
 # }
+
+
+# request is forfilled for param types 
+sub infer_type_params {
+    my ($self, $type_manager, @params) = @_;
+    $type_manager->push_frame;
+    $self->infer_from_multilist($type_manager, $self->children);
+    $self->local_vars($type_manager->pop_frame);
+        # iterate over first nodes of the list
+    # find a return node
+    # acquire its type
+        # NUMBER
+        # HASH
+        # ARRAY
+        # STRING
+
+    # register func type
+
+
+
+}
 
 sub _header {
     my ($self) = @_;

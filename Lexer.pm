@@ -217,6 +217,12 @@ sub _extract_node {
     };
 
     given ($$str) {
+        when (/$re_comment/)    { $node = new Node::Comment($$str);
+                                  $$str =~ s/$re_comment// }
+
+        when (/$re_whitespace/) { $node = new Node::Whitespace;
+                                  $$str =~ s/$re_whitespace// }
+                                  
         when (/$re_float/)      { $process_number->($re_float) }
         
         when (/$re_hex/)        { $process_number->($re_hex) }
@@ -268,12 +274,6 @@ sub _extract_node {
 
         when (/$re_identifier/) { $node = $self->_get_identifier($&);
                                   $$str =~ s/$re_identifier// }
-
-        when (/$re_comment/)    { $node = new Node::Comment($$str);
-                                  $$str =~ s/$re_comment// }
-
-        when (/$re_whitespace/) { $node = new Node::Whitespace;
-                                  $$str =~ s/$re_whitespace// }
 
         when (/$re_lncontinue/) { $node = new Node::Lncontinue }
 

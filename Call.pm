@@ -32,6 +32,23 @@ sub _kind {
     return 'FUNCTION_CALL';
 }
 
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    my $type = $self->SUPER::infer_type($type_manager);
+    if ($self->subkind eq 'CALL') {
+        print $self->value;
+        my @param_types;
+        if ($type->kind ~~ ['NUMBER', 'STRING', 'HASH']) {
+            push @param_types, $type;
+        } else {
+            @param_types = @{$type->data};
+        }
+        $type = $type_manager->request_func($self->value, @param_types);
+        $self->type($type);
+    }
+    return $self->type;
+}
+
 sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
@@ -146,11 +163,11 @@ sub to_string {
     my $is_num = ($self->type->get_query(0)->kind eq 'NUMBER');
 
     if ($node->type->kind eq 'HASH') {
-        $str = "sort(keys($str))"
+        $str = "sort(keys($str))";
     } elsif ($is_num) {
-        $str = "sort({\$a <=> \$b} $str)"
+        $str = "sort({\$a <=> \$b} $str)";
     } else {
-        $str = "sort($str)"
+        $str = "sort($str)";
     }
 
     return $str;
