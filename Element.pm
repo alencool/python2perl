@@ -90,11 +90,6 @@ sub to_string {
     return $str;
 }
 
-
-sub _kind {
-    return 'COMPARISON';
-}
-
 #-----------------------------------------------------------------------
 package Node::Closer;
 use base 'Node::Element';
@@ -121,16 +116,6 @@ sub _on_event_add_child {
     return $add_child;
 }
 
-sub infer_type {
-    my ($self, $type_manager) = @_;
-    my ($type, $multi);
-    $multi = $self->children;
-    $type = $self->infer_from_multilist($type_manager, $multi);
-    $self->type($type);
-    return $type;
-
-}
-
 #-----------------------------------------------------------------------
 package Node::Dict;
 use base 'Node::Encloser';
@@ -148,6 +133,7 @@ sub to_string {
 
 sub infer_type {
     my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
     my $type;
     my $dict = {};
     my @lists = $self->children->get_lists;
@@ -388,7 +374,10 @@ sub to_string {
         when ('HASH')   { $str = '%'.$self->value }
         when ('ARRAY')  { $str = '@'.$self->value }
         default         { $str = '$'.$self->value }
-    } 
+    }
+    if ($self->prev and $self->prev->kind eq 'IN') {
+        $context = 'IN';
+    }
     if (!$context) {
         given ($self->type->kind) {
             when ('HASH')   { $str = "\\$str" }
@@ -410,7 +399,6 @@ sub infer_type {
 sub imply_type {
     my ($self, $type_manager, $type) = @_;
     $self->type($type);
-
     $type_manager->set_type($self->value, $type);
 }
 

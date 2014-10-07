@@ -198,7 +198,6 @@ sub translate_sprintf {
                 ($list->[$i - 1]->type->kind eq 'STRING' or 
                 $list->[$i - 1]->kind eq 'STRING')) {
                 # found 'fmt_str % args'
-
                 my $sprintf = new Node::Sprintf::;
                 $sprintf->add_child($list->[$i - 1]);   # fmt string
                 $sprintf->add_child($list->[$i + 1]);   # args
@@ -291,6 +290,7 @@ sub infer_from_list {
     return $type;
 }
 
+# Generic typing based on multilist contents
 sub infer_from_multilist {
     my ($self, $type_manager, $multi) = @_;
     my (@types, $type);

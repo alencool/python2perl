@@ -49,7 +49,7 @@ sub get_query {
                 $type = $data->{$key};
             } else {
                 my @keys = keys(%$data);
-                $type = $data->{$keys[0]};
+                $type = $data->{$keys[0]} if @keys;
             }
         } 
     };
@@ -64,7 +64,7 @@ sub get_query {
             }
             if (defined $data->[$key]) {
                 $type = $data->[$key];
-            } else {
+            } elsif (defined $data->[0]) {
                 $type = $data->[0];
             }
         } 
@@ -102,14 +102,15 @@ sub set_query {
 
 package Type::Manager;
 use base 'Class::Accessor';
-Type::Manager->mk_accessors(qw(data frames kinds));
+Type::Manager->mk_accessors(qw(data frames seq ftype));
 
 # constructor
 sub new {
     my ($class, @args) = @_;
     my $self = {frames  => [{}],    # new frame when inside function
                 funcs   => {},      # stores registered functions
-                kinds   => {},      # declared vars names, kinds
+                seq     => [],      # declared name, kind,..
+                ftype   => undef,   # function return type
                 };
 
     my $object = bless $self, $class;
@@ -133,8 +134,14 @@ sub get_type {
 sub set_type {
     my ($self, $name, $type) = @_;
     my $frame = $self->frames->[0];
-    $self->kinds->{$name}{$type->kind} = 1;
+    push @{$self->seq}, ($name, $type->kind);
     $frame->{$name} = $type;
+}
+
+# register a function return type
+sub register_ftype {
+    my ($self, $type) = @_;
+    $self->ftype($type);
 }
 
 # register function to be notified of param types later
@@ -146,8 +153,14 @@ sub register_func {
 # request function type, passing param types
 sub request_func {
     my ($self, $name, @params) = @_;
-    my $node = $self->funcs->{$name};
-    my $type = $node->infer_type_params($self, @params);
+    my ($node, $type);
+    if ($name ~~ $self->funcs) {
+        $node = $self->funcs->{$name};
+        $type = $node->infer_type_params($self, @params);    
+    } else {
+        $type = new Type('NUMBER');
+    }
+
     return $type;
 }
 
@@ -155,14 +168,16 @@ sub request_func {
 sub push_frame {
     my ($self) = @_;
     unshift @{$self->frames}, {};
-    $self->kinds({});
+    $self->seq([]);
+    $self->ftype(undef);
 }
 
 # remove top frame from stack
 sub pop_frame {
     my ($self) = @_;
+    my $ftype = $self->ftype || new Type('NUMBER');
     shift @{$self->frames};
-    return $self->kinds;
+    return ($ftype, $self->seq);
 }
 
 

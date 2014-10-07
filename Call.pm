@@ -44,8 +44,10 @@ sub infer_type {
             @param_types = @{$type->data};
         }
         $type = $type_manager->request_func($self->value, @param_types);
-        $self->type($type);
+    } else {
+        $type = new Type('NUMBER');
     }
+    $self->type($type);
     return $self->type;
 }
 
@@ -292,6 +294,7 @@ sub to_string {
 sub infer_type {
     my ($self, $type_manager) = @_;
     $self->SUPER::infer_type($type_manager);
+    $self->caller->infer_type($type_manager);
     $self->type(new Type('STRING'));
     return $self->type;
 }
@@ -319,8 +322,19 @@ use base 'Node::MethodCall';
 sub to_string {
     my ($self) = @_;
     my $lst_org = $self->caller->to_string('EXPAND');
-    my $lst_app = $self->children->get_single->to_string('EXPAND');
-    return "push($lst_org, $lst_app)";
+    my $item = $self->children->get_single->to_string;
+    return "push($lst_org, $item)";
+}
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    my $item = $self->children->get_single;
+    if ($self->caller->type->kind eq 'ARRAY') {
+        # if caller list is empty and appending an item can 
+        # potentially modify its original type
+        $self->caller->type->set_query(0, $item->type);
+    }
 }
 
 #-----------------------------------------------------------------------

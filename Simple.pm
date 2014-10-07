@@ -33,8 +33,8 @@ sub _on_event_add_child {
     my $add_child = FALSE;
     given ($node->kind) {
         when ('COMA_SEPERATOR') { $self->children->new_list }
-        when ('STMT_SEPERATOR') { $self->complete(TRUE)    }
-        default                 { $add_child = TRUE        }
+        when ('STMT_SEPERATOR') { $self->complete(TRUE)     }
+        default                 { $add_child = TRUE         }
     }
     return $add_child;
 }
@@ -110,6 +110,17 @@ sub _assign_types {
                     $type = $types[$i] || $types[0];
                     $node->imply_type($type_manager, $type);
                 }
+            }
+        }
+    } elsif ($self->assignment eq '+=') {
+        my $target = $self->targets->[-1]->get_single;
+        if ($target->type->kind eq 'ARRAY') {
+            # if target is empty and concatination of another list
+            # then it can potentially modify its type inferance
+            $type = $self->type;
+            if ($type->kind eq 'ARRAY') {
+                $type = $type->get_query(0);
+                $target->type->set_query(0, $type);
             }
         }
     }
@@ -218,7 +229,6 @@ sub _on_event_add_child {
     my ($self, $node) = @_;
     my $add_child = FALSE;
     if ($node->kind eq 'ASSIGNMENT') {
-
         # transformed to assignment statement, extract targets
         $self->_peel_multilist;
         $self->children->chomp;
@@ -341,6 +351,7 @@ sub to_string {
     # join statments with new line
     $str_buffer = join("\n", @strings);
 
+    # if empty print stmt then just have newline
     if ($self->children->is_empty) {
         $str_buffer = $self->indent.qq/print("\\n");/;
     }
@@ -353,6 +364,12 @@ sub to_string {
 #-----------------------------------------------------------------------
 package Node::Return;
 use base 'Node::Simple';
+
+sub infer_type {
+    my ($self, $type_manager) = @_;
+    $self->SUPER::infer_type($type_manager);
+    $type_manager->register_ftype($self->type);
+}
 
 #-----------------------------------------------------------------------
 package Node::Last;
