@@ -78,6 +78,7 @@ sub _body {
     my ($self) = @_;
     my $list = $self->children->get_list(0);
     my @strings = map {$_->to_string} @$list;
+    shift @strings;
     return join("\n", @strings);
 }
 
