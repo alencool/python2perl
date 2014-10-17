@@ -351,14 +351,14 @@ sub to_string {
         pop @strings;
     }
     # write comment
-    $strings[-1] .= $self->comment;
+    $strings[-1] .= $self->comment if $strings[-1];
 
     # join statments with new line
     $str_buffer = join("\n", @strings);
 
     # if empty print stmt then just have newline
     if ($self->children->is_empty) {
-        $str_buffer = $self->indent.qq/print("\\n");/;
+        $str_buffer = $self->indent.qq/print("\\n");/.$self->comment;
     }
 
     return $str_buffer;
