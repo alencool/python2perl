@@ -167,6 +167,7 @@ sub infer_type {
         when ('ARGV')           { $target_is_str = TRUE }
         when ('STDIN')          { $target_is_str = TRUE }
         when ('CALLOPEN')       { $target_is_str = TRUE }
+        when ('CALLREADLINES')  { $target_is_str = TRUE }
         when ('CALLFILEINPUT')  { $target_is_str = TRUE }
         when ('SUBSCRIPT')      { $target_is_str = 
                          ($iter->type->kind eq 'STRING')}
@@ -175,9 +176,9 @@ sub infer_type {
         when ('LIST')           { $target_is_str = 
            ($iter->type->get_query(0)->kind eq 'STRING')}
     }
-    if ($target_is_str) {    
+    if ($target_is_str) {
         $target->imply_type($type_manager, new Type('STRING'));
-    }
+    } 
     $self->SUPER::infer_type($type_manager);
 }
 
@@ -316,6 +317,7 @@ sub to_string {
     my ($self) = @_;
     my $list = $self->children->get_list(0);
     my @strings = map {$_->to_string} @$list;
+    shift @strings;
     return join("\n", @strings);
 }
 

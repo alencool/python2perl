@@ -102,13 +102,15 @@ sub to_string {
     my $kind = $node->kind;
     if ($type_kind eq 'STRING') {
         $str = qq/length($str)/;
-    } elsif ($kind eq 'IDENTIFIER') {
-        $str = qq/scalar($str)/;
-    } elsif ($kind eq 'SUBSCRIPT') {
+    } elsif ($type_kind eq 'ARRAY') {
         $str = qq/scalar($str)/;
     } elsif ($kind eq 'LIST') {
         $str = $node->to_string;
         $str = qq/scalar(\@{$str})/;
+    } elsif ($kind eq 'IDENTIFIER') {
+        $str = qq/length($str)/;
+    } elsif ($kind eq 'SUBSCRIPT') {
+        $str = qq/length($str)/;
     } else {
         $str = qq/scalar(\@{[$str]})/;
     }
@@ -161,7 +163,7 @@ sub to_string {
     my ($self) = @_;
     my $node = $self->children->get_single;
     my $str = $node->to_string('EXPAND');
-    my $is_num = ($self->type->get_query(0)->kind eq 'NUMBER');
+    my $is_num = ($node->type->get_query(0)->kind eq 'NUMBER');
 
     if ($node->type->kind eq 'HASH') {
         $str = "sort(keys($str))";
@@ -201,11 +203,15 @@ sub to_string {
 
     if ($j and @$j > 0) {
         # consider 2 argument range
-        $j = $self->_nodes_minus_one($j);
+        if (not $self->join_nodes($j) eq 'scalar(@ARGV)'){
+            $j = $self->_nodes_minus_one($j);
+        }
         $str = $self->join_nodes($i).'..'.$self->join_nodes($j);
     } else {
         # consider 1 argument range
-        $i = $self->_nodes_minus_one($i);
+        if (not $self->join_nodes($i) eq 'scalar(@ARGV)'){
+            $i = $self->_nodes_minus_one($i);
+        }
         $str = '0..'.$self->join_nodes($i);
     }
 
@@ -215,7 +221,7 @@ sub to_string {
 sub infer_type {
     my ($self, $type_manager) = @_;
     $self->SUPER::infer_type($type_manager);
-    $self->type(new Type([1..10]));
+    $self->type(new Type([new Type('NUMBER')]));
     return $self->type;
 }
 
@@ -283,8 +289,8 @@ sub to_string {
     my $cl_value = uc($self->caller->value);
     my $cl_subkind = $self->caller->subkind;
     given ($cl_subkind) {
-        when ('IDENTIFIER') { $str = "<$cl_value>" }
-        default             { $str = "<STDIN>" }
+        when ('IDENTIFIER') { $str = "scalar(<$cl_value>)" }
+        default             { $str = "scalar(<STDIN>)" }
     }
     return $str;
 }
@@ -310,9 +316,27 @@ sub infer_type {
     return $self->type;
 }
 
+sub to_string {
+    my ($self) = @_;
+    my $str;
+    my $cl_value = uc($self->caller->value);
+    my $cl_subkind = $self->caller->subkind;
+    given ($cl_subkind) {
+        when ('IDENTIFIER') { $str = "<$cl_value>" }
+        default             { $str = "<STDIN>" }
+    }
+    return $str;
+}
+
+
 #-----------------------------------------------------------------------
 package Node::CallFileinput;
 use base 'Node::MethodCall';
+
+sub to_string {
+    my ($self) = @_;
+    return "(my \@target = <>)";
+}
 
 #-----------------------------------------------------------------------
 package Node::CallAppend;
@@ -344,7 +368,7 @@ sub to_string {
     my ($self) = @_;
     my $str = $self->caller->to_string('EXPAND');
 
-    if (not $self->is_leaf){
+    if ($self->is_leaf){
         $str = "pop($str)";
     } else {
         my $key = $self->_get_key;
@@ -405,13 +429,23 @@ sub to_string {
     my $string_arg = $self->caller->to_string;
     my $deli = $self->children->get_list(0);
     my $max = $self->children->get_list(1);
-    $deli = (@$deli ? $deli->[0]->value : ' ');
-    $max = ($max ? $self->join_nodes($self->_nodes_plus_one($max)) : undef);
+    if ($deli->[0] and $deli->[0]->kind eq 'IDENTIFIER' 
+        and $deli->[0]->value eq 'None') {
+        $deli = "\\s+";
+    } elsif ($deli->[0] and not $deli->[0]->value) {
+        $deli = "\\s+";
+    } elsif ($deli->[0] and $deli->[0]->value =~ '\$') {
+        $deli = (@$deli ? $deli->[0]->value : ' ');
+    } else {
+        $deli = (@$deli ? '\Q'.$deli->[0]->value.'\E' : ' ');
+    }
+    
+    $max = (defined $max ? $self->join_nodes($self->_nodes_plus_one($max)) : undef);
 
     if (defined $max) {
-         $str = "split(/\\Q$deli\\E/, $string_arg, $max)";
+         $str = "split(/$deli/, $string_arg, $max)";
     } else {
-         $str = "split(/\\Q$deli\\E/, $string_arg)";
+         $str = "split(/$deli/, $string_arg)";
     }
 
     return $str;
@@ -461,8 +495,13 @@ sub to_string {
         my $patt = $self->children->get_list(0)->[0]->value;
         my $text = $self->children->get_list(1)->[0]->to_string;
         $patt = $self->_convert_pattern($patt);
-        $handle = $handle->to_string;
-        $str = "$handle = ($text =~ /$patt/)";
+        if ($handle) {
+            $handle = $handle->to_string;
+            $str = "$handle = ($text =~ /$patt/)";
+        } else {
+            $str = "$text =~ /$patt/";
+        }
+
     }
     return $str;
 }
@@ -475,6 +514,7 @@ use base 'Node::CallSearch';
 sub to_string {
     my ($self, $handle) = @_;
     my $str = '';
+    $handle ||= '';
     if ($handle ne 'EXPAND') {
         $str = $self->SUPER::to_string($handle);
         # make sure it only matches at the start
@@ -491,10 +531,19 @@ sub to_string {
     my ($self, $handle) = @_;
     my $str = '';
     if ($handle ne 'EXPAND') {
-        my $patt = $self->children->get_list(0)->[0]->value;
-        my $repl = $self->children->get_list(1)->[0]->value;
+        my $patt = $self->children->get_list(0)->[0];
+        my $repl = $self->children->get_list(1)->[0];
+        if ($patt->kind eq 'IDENTIFIER') {
+            $patt= $patt->to_string;
+        } else {
+            $patt = $self->_convert_pattern($patt->value);
+        }
+        if ($repl->kind eq 'IDENTIFIER') {
+            $repl= $repl->to_string;
+        } else {
+            $repl = $repl->value;
+        }
         my $text = $self->children->get_list(2)->[0]->to_string;
-        $patt = $self->_convert_pattern($patt);
         $handle = $handle->to_string;
         $str = "($handle = $text) =~ s/$patt/$repl/g";
     }
@@ -508,7 +557,8 @@ use base 'Node::MethodCall';
 sub to_string {
     my ($self) = @_;
     my $num = $self->children->get_single->value;
-    return "\$$num";
+    my $str = $num eq '0' ? "\$&" : "\$$num";
+    return $str;
 }
 
 sub infer_type {

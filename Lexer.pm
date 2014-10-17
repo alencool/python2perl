@@ -257,6 +257,9 @@ sub _extract_node {
                                   $value =~ s/\$/\\\$/g;
                                   #escape @ symbols
                                   $value =~ s/@/\\@/g;
+                                  #escape unescaped "
+                                  $value =~ s/((?<!\\)(\\\\)*")/\\$1/;
+
                                   $node = new Node::String($value);
                                   $$str =~ s/$re_string// }
 
@@ -299,7 +302,7 @@ sub _get_keyword {
         when ('break')      { $node = new Node::Last }
         when ('continue')   { $node = new Node::Next }
         when ('print')      { $node = new Node::Print }
-        when ('not')        { $node = new Node::Not('!') }
+        when ('not')        { $node = new Node::Not('not') }
         when ('and')        { $node = new Node::And('&&') }
         when ('or')         { $node = new Node::Or('||') }
         when ('True')       { $node = new Node::Number('1') }

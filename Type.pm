@@ -56,6 +56,7 @@ sub get_query {
 
     # set type from array index
     my $_array = sub {
+
         if (@$data) {
             if ($key !~ /^\d+?$/) {
                 $key = 0;
@@ -75,7 +76,6 @@ sub get_query {
         when ('ARRAY')  { $_array->() }
         when ('HASH')   { $_hash->() }
     }
-
     return $type;
 }
 

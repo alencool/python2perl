@@ -72,11 +72,12 @@ sub _init {
     $self->assignment('');
 }
 
+
 sub infer_type {
     my ($self, $type_manager) = @_;
 
     # get type from right most multilist
-    $self->SUPER::infer_type($type_manager);
+    $self->SUPER::infer_type($type_manager, "expression");
 
     # infer and assign types for targets
     $self->_assign_types($type_manager) if $self->assignment;
@@ -104,6 +105,7 @@ sub _assign_types {
             if ($target->list_count == 1) { 
                 $node = $target->get_single;
                 $node->imply_type($type_manager, $self->type);
+
             } else {
                 for (my $i = 0; $i < $target->list_count; $i++) {
                     $node = @{$target->get_list($i)}[0];
@@ -230,7 +232,7 @@ sub _on_event_add_child {
     my $add_child = FALSE;
     if ($node->kind eq 'ASSIGNMENT') {
         # transformed to assignment statement, extract targets
-        $self->_peel_multilist;
+        $self->_peel_multilist('LIST');
         $self->children->chomp;
         push @{$self->targets}, $self->children;
         $self->children(new MultiList);
@@ -276,19 +278,22 @@ sub to_string {
     for my $expr (@expressions) {
         my $is_single = (@$expr == 1);
         my $is_empty = (@$expr == 0);
+        my $expr_kind = $is_empty ? "EMPTY" : $expr->[0]->kind;
 
-        if ($is_single and $expr->[0]->kind ~~ $interpolatable) {
+        if ($expr_kind eq 'SUBSCRIPT' and $expr->[0]->to_string =~ /^sub/) {
+            $expr_kind = 'MICE';
+        } 
+        if ($is_single and $expr_kind ~~ $interpolatable) {
             $str_buffer .= ' ' if @args || $str_buffer;
-            if ($expr->[0]->kind ~~ 'STRING') {
+            if ($expr_kind ~~ 'STRING') {
                 $str_buffer .= $expr->[0]->value;
             } else {
                 $str_buffer .= $expr->[0]->to_string('EXPAND');
             }
-        } elsif ($is_single and $expr->[0]->kind ~~ 'SPRINTF') {
+        } elsif ($is_single and $expr_kind ~~ 'SPRINTF') {
             $push_buffer->();
             push @args, $expr->[0];
         } elsif ($is_empty) {
-            $str_buffer .= ' ';
             $new_line = FALSE;
         } else {
             $push_buffer->();

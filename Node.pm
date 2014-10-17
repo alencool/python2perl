@@ -182,7 +182,8 @@ sub infer_type {
     my ($self, $type_manager) = @_;
     $type_manager = new Type::Manager unless defined $type_manager;
     my $multi = $self->children;
-    $self->type($self->infer_from_multilist($type_manager, $multi));
+    my $type = $self->infer_from_multilist($type_manager, $multi);
+    $self->type($type);
     return $self->type;
 }
 
@@ -314,11 +315,14 @@ sub infer_from_multilist {
 
 # removes layers of parenthesis from the children multilist
 sub _peel_multilist {
-    my ($self, $node) = @_;
+    my ($self, $other) = @_;
+    my $node;
+    my $shells = ['TUPLE'];
+    push @$shells, $other if $other; 
     my $children = $self->children;
     while ($children->is_single) {
         $node = $children->get_single;
-        if ($node->kind eq 'TUPLE') {
+        if ($node->kind ~~ $shells) {
             $children = $node->children;
         } else {
             last;

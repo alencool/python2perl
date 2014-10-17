@@ -22,13 +22,13 @@ package Node::Element;
 use Constants;
 use base 'Node';
 
-sub infer_type {
-    my ($self, $type_manager) = @_;
-    my $multi = $self->children;
-    $self->infer_from_multilist($type_manager, $multi);
-    $self->type(new Type('NUMBER'));
-    return $self->type;
-}
+# sub infer_type {
+#     my ($self, $type_manager) = @_;
+#     my $multi = $self->children;
+#     $self->infer_from_multilist($type_manager, $multi);
+#     $self->type(new Type('NUMBER'));
+#     return $self->type;
+# }
 
 #-----------------------------------------------------------------------
 
@@ -160,6 +160,57 @@ sub infer_type {
 package Node::List;
 use base 'Node::Encloser';
 
+
+# attempt to deduce its representive type from list of nodes
+# - order of importance, hash, array, string the default, number
+sub infer_from_list {
+    my ($self, $type_manager, @nodes) = @_;
+    my $type = new Type('NUMBER');
+    for my $node (@nodes) {
+        $node->infer_type($type_manager);
+    }
+    for my $node (@nodes) {
+        my $node_t = $node->type;;
+        if ($node_t->kind eq 'HASH') {
+            $type = $node_t;
+            last;
+        } elsif ($node_t->kind eq 'ARRAY') {
+            if ($type->kind eq 'ARRAY') {
+                my @merged = (@{$type->data});
+                push @merged, @{$node_t->data};
+                $type = new Type(\@merged);
+            } else {
+                $type = $node_t;
+            }
+        } elsif ($node_t->kind eq 'STRING' and $type->kind ne 'ARRAY') {
+            $type = new Type('STRING');
+        }
+    }
+    return $type;
+}
+
+# Generic typing based on multilist contents
+sub infer_from_multilist {
+    my ($self, $type_manager, $multi) = @_;
+    my (@types, $type);
+    my @lists = $multi->get_lists;
+    for my $list (@lists){
+        if (@$list) {
+            $type = $self->infer_from_list($type_manager, @$list);
+            push @types, $type;
+        }
+    }
+    if (@types > 1) {
+        $type = new Type(\@types);
+    } elsif (@types == 1){
+        $type = $types[0];
+    } else {
+        $type = new Type('NUMBER');
+    }
+
+    return $type;
+}
+
 sub to_string {
     my ($self, $context) = @_;
     my $str = $self->join_children;
@@ -173,6 +224,7 @@ sub to_string {
 
 sub infer_type {
     my ($self, $type_manager) = @_;
+
     $self->SUPER::infer_type($type_manager);
     if ($self->type->kind ne 'ARRAY') {
         $self->type(new Type([$self->type]));
@@ -236,6 +288,7 @@ sub to_string {
     my $cl_nonsca = $self->caller->to_string('EXPAND');
     
     my $signature = $self->_get_signature;
+    $signature =~ s/\"//g;
     my $str;
 
 
@@ -245,6 +298,14 @@ sub to_string {
         $str = $cl_nonsca."[$signature]";
         $str = "\@{$cl_scalar}[$signature]" if $cl_kind eq 'SUBSCRIPT';
         $str = "[$str]" unless ($context ~~ 'EXPAND');
+        if ($self->caller->type->kind eq 'STRING') {
+            my $i = $self->join_nodes($self->children->get_list(0));
+            my $j = $self->join_nodes($self->children->get_list(1));
+            my $len = eval("$j - $i");
+            $signature = $j ? "$i, $len" : "$i";
+            $str = "substr($cl_scalar, $signature)";
+        }
+
     } else { 
         if ($self->caller->type->kind eq 'HASH') {
             $str = $cl_scalar."{$signature}";
@@ -262,6 +323,10 @@ sub to_string {
                 when ('HASH')   { $str = "%{$str}" }
             }
         }
+        if ($self->caller->type->kind eq 'STRING') {
+            $str = "substr($cl_scalar, $signature, 1)";
+        }
+
     }
 
     return $str;
